@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica Whitepapers</title>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #101317;
+            --panel: #181d23;
+            --panel-2: #202832;
+            --text: #eef2f4;
+            --muted: #9ca7ad;
+            --line: rgba(255,255,255,0.12);
+            --accent: #f0b24f;
+            --accent-2: #4cc9a4;
+            --danger: #e96d5f;
+            --vacuum: #76a7ff;
+            --code: #0d1117;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.62;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: #ffd18a;
+        }
+
+        code,
+        pre {
+            font-family: "SF Mono", Consolas, "Liberation Mono", monospace;
+        }
+
+        code {
+            color: #d6edf5;
+        }
+
+        .page {
+            width: min(1180px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 28px 0 60px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0 28px;
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .brand strong {
+            font-size: 16px;
+        }
+
+        .brand span {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .back-link {
+            padding: 9px 13px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            color: var(--text);
+        }
+
+        .hero {
+            padding: 34px 0 30px;
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+        }
+
+        h1 {
+            margin: 0 0 14px;
+            font-size: clamp(34px, 6vw, 64px);
+            line-height: 1.04;
+            letter-spacing: 0;
+        }
+
+        .lead {
+            max-width: 860px;
+            margin: 0;
+            color: #c3c9cc;
+            font-size: 18px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .meta {
+            padding: 13px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.035);
+        }
+
+        .meta span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .meta strong {
+            display: block;
+            margin-top: 4px;
+            color: var(--accent);
+            font-family: "SF Mono", Consolas, monospace;
+            font-size: 15px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px minmax(0, 1fr);
+            gap: 34px;
+            align-items: start;
+            margin-top: 34px;
+        }
+
+        nav {
+            position: sticky;
+            top: 18px;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.035);
+        }
+
+        nav h2 {
+            margin: 0 0 10px;
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.10em;
+        }
+
+        nav a {
+            display: block;
+            padding: 7px 0;
+            color: #cbd2d5;
+            font-size: 14px;
+        }
+
+        section {
+            padding: 28px 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        section:first-child {
+            padding-top: 0;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: 26px;
+            line-height: 1.2;
+        }
+
+        h3 {
+            margin: 24px 0 8px;
+            font-size: 18px;
+        }
+
+        p {
+            margin: 10px 0;
+            color: #c7ccce;
+        }
+
+        ul {
+            margin: 10px 0 0;
+            padding-left: 22px;
+            color: #c7ccce;
+        }
+
+        li + li {
+            margin-top: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0 6px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--line);
+            color: #c7ccce;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: rgba(255,255,255,0.05);
+            color: #f2f5f4;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .formula-card {
+            margin: 14px 0 16px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025));
+            overflow: hidden;
+        }
+
+        .formula-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .formula-title strong {
+            color: var(--accent);
+            font-family: "SF Mono", Consolas, monospace;
+            font-size: 12px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .formula {
+            padding: 14px 18px;
+            overflow-x: auto;
+            color: #eef2f4;
+        }
+
+        .formula .MathJax {
+            outline: none;
+        }
+
+        pre {
+            margin: 12px 0;
+            padding: 14px 16px;
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--code);
+            color: #d6edf5;
+        }
+
+        .note,
+        .warning {
+            margin: 18px 0;
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-left-width: 4px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.035);
+        }
+
+        .note {
+            border-left-color: var(--accent-2);
+        }
+
+        .warning {
+            border-left-color: var(--danger);
+        }
+
+        .fnref {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            margin-left: 3px;
+            padding: 0 5px;
+            border: 1px solid rgba(240,178,79,0.35);
+            border-radius: 999px;
+            color: var(--accent);
+            font-size: 11px;
+            line-height: 1;
+            vertical-align: super;
+        }
+
+        .footnotes,
+        .sources {
+            display: grid;
+            gap: 10px;
+            margin: 16px 0 0;
+            padding-left: 22px;
+        }
+
+        .footnotes li,
+        .sources li {
+            padding-left: 4px;
+            color: #c7ccce;
+        }
+
+        .footnotes li::marker,
+        .sources li::marker {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .source-title {
+            display: block;
+            color: #f2f5f4;
+            font-weight: 700;
+        }
+
+        .source-note {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .split {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .chip {
+            padding: 6px 9px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.04);
+            color: #c7ccce;
+            font-size: 13px;
+        }
+
+        @media (max-width: 920px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            nav {
+                position: static;
+            }
+
+            .meta-grid,
+            .split {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 620px) {
+            .meta-grid,
+            .split {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="topbar">
+        <div class="brand">
+            <strong>Ballistica</strong>
+            <span>Техническое описание модели</span>
+        </div>
+        <a class="back-link" href="index.html">К симулятору</a>
+    </div>
+
+    <header class="hero">
+        <h1>Ballistica Whitepapers</h1>
+        <p class="lead">Учебная модель внешней баллистики: 3D-ветер, детерминированная турбулентность, сопротивление по \(C_d(M)\), ось корпуса, угол атаки, упрощенный момент от ЦТ/ЦД и спиновое демпфирование.</p>
+        <div class="meta-grid">
+            <div class="meta"><span>Интегратор</span><strong>RK4 + attitude</strong></div>
+            <div class="meta"><span>Атмосфера</span><strong>ISA 0-20 km</strong></div>
+            <div class="meta"><span>Аэродинамика</span><strong>Cd(M) + normal force</strong></div>
+            <div class="meta"><span>Проверки</span><strong>13 tests</strong></div>
+        </div>
+    </header>
+
+    <div class="layout">
+        <nav>
+            <h2>Разделы</h2>
+            <a href="#scope">Назначение</a>
+            <a href="#state">Состояние</a>
+            <a href="#airflow">Ветер</a>
+            <a href="#drag">Сопротивление</a>
+            <a href="#attitude">Угол атаки</a>
+            <a href="#constructor">Конструктор</a>
+            <a href="#atmosphere">Атмосфера</a>
+            <a href="#integration">Интегрирование</a>
+            <a href="#verification">Верификация</a>
+            <a href="#book">Сноски</a>
+            <a href="#sources">Литература</a>
+            <a href="#limits">Ограничения</a>
+        </nav>
+
+        <main>
+            <section id="scope">
+                <h2>Назначение и границы</h2>
+                <p>Проект нужен для визуальной и численной проверки внешней баллистики на уровне учебной инженерной модели. Он показывает, как меняется траектория при изменении скорости, угла, ветра, плотности, формы сопротивления, положения центра тяжести, центра давления и спина.<a class="fnref" href="#src-mccoy">2</a></p>
+                <div class="warning">
+                    Это не таблицы стрельбы, не fire-control система и не инструмент для наведения или корректировки огня. Пресеты являются учебными и не заменяют паспортные данные изделия.
+                </div>
+            </section>
+
+            <section id="state">
+                <h2>Состояние снаряда</h2>
+                <p>Поступательное состояние хранит положение и скорость центра масс. Дополнительно хранится единичная ось корпуса \(\hat b\) и угловая скорость \(\omega\). Ось корпуса используется для угла атаки и визуального положения снаряда.</p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Поступательное состояние <strong>state</strong></div>
+                    <div class="formula">
+                        \[
+                        \mathbf r = (x,y,z), \qquad
+                        \mathbf v = (v_x,v_y,v_z)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Ориентация корпуса <strong>attitude</strong></div>
+                    <div class="formula">
+                        \[
+                        \hat b = (b_x,b_y,b_z), \qquad
+                        \|\hat b\| = 1, \qquad
+                        \boldsymbol\omega = (\omega_x,\omega_y,\omega_z)
+                        \]
+                    </div>
+                </div>
+
+                <p>Начальная скорость раскладывается по углу возвышения и азимуту. Начальная ось корпуса совпадает со скоростью, затем может быть смещена параметрами <code>initialYawOffset</code> и <code>initialPitchOffset</code> для тестирования устойчивости.</p>
+            </section>
+
+            <section id="airflow">
+                <h2>Ветер и турбулентность</h2>
+                <p>Воздух задается как сумма постоянного 3D-ветра и гладкого детерминированного поля порывов. Внутри RK4 нет <code>Math.random()</code>, поэтому одинаковые параметры дают одинаковую траекторию.</p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Локальная скорость воздуха <strong>airflowVelocityAt</strong></div>
+                    <div class="formula">
+                        \[
+                        \mathbf v_{air}(x,y,z,t) =
+                        (windX, windY, windZ) + \mathbf v_{turb}(x,y,z,t)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Относительная скорость <strong>relative flow</strong></div>
+                    <div class="formula">
+                        \[
+                        \mathbf v_{rel} = \mathbf v - \mathbf v_{air},
+                        \qquad V_{rel} = \|\mathbf v_{rel}\|
+                        \]
+                    </div>
+                </div>
+
+                <div class="chip-row">
+                    <span class="chip">windX: вдоль дальности</span>
+                    <span class="chip">windY: вертикальный поток</span>
+                    <span class="chip">windZ: боковой ветер</span>
+                    <span class="chip">turbulence: амплитуда порывов</span>
+                    <span class="chip">turbulenceScale: пространственный масштаб</span>
+                </div>
+            </section>
+
+            <section id="drag">
+                <h2>Сопротивление и \(C_d(M)\)</h2>
+                <p>Базовое сопротивление рассчитывается через динамическое давление, площадь миделя и коэффициент \(C_d\), выбранный по числу Маха. Угол атаки дополнительно увеличивает эффективное сопротивление.<a class="fnref" href="#src-mccoy">2</a><a class="fnref" href="#src-anderson">5</a></p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Динамическое давление <strong>q</strong></div>
+                    <div class="formula">
+                        \[
+                        q = \frac{1}{2}\rho V_{rel}^{2}
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Площадь миделя <strong>A</strong></div>
+                    <div class="formula">
+                        \[
+                        A = \frac{\pi d^2}{4}
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Эффективный коэффициент сопротивления <strong>Cd</strong></div>
+                    <div class="formula">
+                        \[
+                        C_{d,eff} = C_d(M)\,\bigl(1 + 1.8\,\alpha^2\bigr)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Сила сопротивления <strong>drag</strong></div>
+                    <div class="formula">
+                        \[
+                        D = q\,C_{d,eff}\,A,
+                        \qquad
+                        \mathbf a_D =
+                        -\frac{D}{m\,V_{rel}}\,\mathbf v_{rel}
+                        \]
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Режим</th>
+                        <th>Смысл</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code>machTable</code></td>
+                        <td>Интерполяция по учебной таблице \(C_d(M)\) с трансзвуковым ростом сопротивления.</td>
+                    </tr>
+                    <tr>
+                        <td><code>constant</code></td>
+                        <td>\(C_d = cdConst \cdot formFactor\).</td>
+                    </tr>
+                    <tr>
+                        <td><code>none</code></td>
+                        <td>Сопротивление и нормальная сила отключены для вакуумной проверки.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="attitude">
+                <h2>Угол атаки, нормальная сила и момент</h2>
+                <p>Снаряд больше не всегда смотрит строго по скорости. В модели есть ось корпуса \(\hat b\). Угол атаки считается между этой осью и направлением относительного потока. Он влияет на нормальную силу, сопротивление и аэродинамический момент.</p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Угол атаки <strong>alpha</strong></div>
+                    <div class="formula">
+                        \[
+                        \hat v_{rel} = \frac{\mathbf v_{rel}}{V_{rel}},
+                        \qquad
+                        \alpha = \arccos\bigl(\operatorname{clamp}(\hat b \cdot \hat v_{rel}, -1, 1)\bigr)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Нормальная сила <strong>normal force</strong></div>
+                    <div class="formula">
+                        \[
+                        N = q\,A\,C_N\,\alpha_{lim},
+                        \qquad
+                        \alpha_{lim} = \min(\alpha, 25^\circ)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Направление нормальной силы <strong>side component</strong></div>
+                    <div class="formula">
+                        \[
+                        \hat s =
+                        \operatorname{norm}\!\left(
+                        \hat v_{rel} - \hat b(\hat b \cdot \hat v_{rel})
+                        \right),
+                        \qquad
+                        \mathbf F_N = -N\,\hat s
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Суммарное ускорение <strong>translation</strong></div>
+                    <div class="formula">
+                        \[
+                        \mathbf a =
+                        \mathbf a_D + \frac{\mathbf F_N}{m} + (0,-g,0)
+                        \]
+                    </div>
+                </div>
+            </section>
+
+            <section id="constructor">
+                <h2>Конструктор: ЦТ, ЦД и спин</h2>
+                <p>Нижний конструктор меняет геометрию и устойчивость: диаметр, длину, центр тяжести от носа, центр давления от носа и спин. Эти параметры теперь меняют траекторию, а не только метрики.</p>
+
+                <div class="split">
+                    <div class="formula-card">
+                        <div class="formula-title">Плечо и статический запас <strong>CG/CP</strong></div>
+                        <div class="formula">
+                            \[
+                            l = x_{CP} - x_{CG},
+                            \qquad
+                            SM = \frac{l}{L}
+                            \]
+                        </div>
+                    </div>
+
+                    <div class="formula-card">
+                        <div class="formula-title">Аэродинамический момент <strong>moment</strong></div>
+                        <div class="formula">
+                            \[
+                            M \approx N\,l,
+                            \qquad
+                            \boldsymbol\tau =
+                            (\hat b \times \hat v_{rel})\,N\,l
+                            \]
+                        </div>
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Оценка момента инерции <strong>inertia</strong></div>
+                    <div class="formula">
+                        \[
+                        I \approx \frac{m}{12}
+                        \left(L^2 + 3\left(\frac{d}{2}\right)^2\right)
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Спиновая стабилизация <strong>spin damping</strong></div>
+                    <div class="formula">
+                        \[
+                        S = \frac{\omega_{spin}d}{\max(V_{rel},1)},
+                        \qquad
+                        \omega_{spin} = spinRpm\,\frac{2\pi}{60}
+                        \]
+                        \[
+                        \dot{\boldsymbol\omega} =
+                        \frac{\boldsymbol\tau}{I(1+4S)},
+                        \qquad
+                        \boldsymbol\omega \leftarrow
+                        \boldsymbol\omega\,e^{-\lambda\Delta t}
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Обновление оси корпуса <strong>axis integration</strong></div>
+                    <div class="formula">
+                        \[
+                        \dot{\hat b} = \boldsymbol\omega \times \hat b,
+                        \qquad
+                        \hat b \leftarrow
+                        \operatorname{norm}\!\left(\hat b + \dot{\hat b}\Delta t\right)
+                        \]
+                    </div>
+                </div>
+
+                <p>Если \(x_{CP} > x_{CG}\), момент стремится выровнять корпус по потоку. Если \(x_{CP} < x_{CG}\), модель становится заметно хуже устойчивой: это закреплено отдельным регрессионным тестом.</p>
+            </section>
+
+            <section id="atmosphere">
+                <h2>Атмосфера ISA до 20 км</h2>
+                <p>Функция <code>atmosphereAt(altitudeM, densityScale)</code> использует приближение стандартной атмосферы: тропосфера до 11 км и изотермический слой выше. Высота зажимается в диапазон 0-20000 м.<a class="fnref" href="#src-atmosphere">3</a></p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Тропосфера <strong>0-11 km</strong></div>
+                    <div class="formula">
+                        \[
+                        T = T_0 + Lh,
+                        \qquad
+                        p = p_0\left(\frac{T}{T_0}\right)^{-g/(LR)}
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Плотность и скорость звука <strong>air</strong></div>
+                    <div class="formula">
+                        \[
+                        \rho = \frac{p}{RT}\,densityScale,
+                        \qquad
+                        a = \sqrt{\gamma RT}
+                        \]
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <div class="formula-title">Число Маха <strong>Mach</strong></div>
+                    <div class="formula">
+                        \[
+                        M = \frac{V_{rel}}{a}
+                        \]
+                    </div>
+                </div>
+            </section>
+
+            <section id="integration">
+                <h2>Интегрирование</h2>
+                <p>Поступательное состояние обновляется методом Рунге-Кутты 4-го порядка. После шага поступательного движения вычисляются текущие аэродинамические диагностики и обновляется ось корпуса.<a class="fnref" href="#src-butcher">4</a></p>
+
+                <div class="formula-card">
+                    <div class="formula-title">RK4 <strong>translation</strong></div>
+                    <div class="formula">
+                        \[
+                        \mathbf s(t+\Delta t) =
+                        \mathbf s(t) +
+                        \frac{\Delta t}{6}
+                        \left(k_1 + 2k_2 + 2k_3 + k_4\right)
+                        \]
+                    </div>
+                </div>
+
+                <p>При пересечении земли координаты, время и скорость линейно интерполируются до \(y=0\), чтобы дальность меньше зависела от дискретного шага.</p>
+            </section>
+
+            <section id="verification">
+                <h2>Верификация и тесты</h2>
+                <p>Тесты проверяют не только формулы, но и поведение модели: ветер, турбулентность, влияние массы, ЦТ/ЦД и спина. Локальная книга подключена как источник контрольных условий и отдельных сверочных строк, а не как встроенная таблица стрельбы.<a class="fnref" href="#fn-book-title">1</a><a class="fnref" href="#fn-book-v0">4</a><a class="fnref" href="#fn-book-use">5</a></p>
+
+                <div class="formula-card">
+                    <div class="formula-title">Вакуумная парабола <strong>analytic check</strong></div>
+                    <div class="formula">
+                        \[
+                        v_x = v_0\cos\theta,
+                        \qquad
+                        v_y = v_0\sin\theta
+                        \]
+                        \[
+                        t_{impact} =
+                        \frac{v_y + \sqrt{v_y^2 + 2gh_0}}{g},
+                        \qquad
+                        R = v_x t_{impact}
+                        \]
+                        \[
+                        h_{max} = h_0 + \frac{v_y^2}{2g}
+                        \]
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Сценарий</th>
+                        <th>Что проверяется</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>ISA</td>
+                        <td>Плотность и скорость звука у земли и около 11 км.</td>
+                    </tr>
+                    <tr>
+                        <td>\(C_d(M)\)</td>
+                        <td>Трансзвуковой пик и конечная интерполяция.</td>
+                    </tr>
+                    <tr>
+                        <td>Вакуум</td>
+                        <td>RK4 совпадает с аналитической параболой.</td>
+                    </tr>
+                    <tr>
+                        <td>3D-ветер</td>
+                        <td><code>windY</code> меняет апогей, <code>windZ</code> дает боковой снос.</td>
+                    </tr>
+                    <tr>
+                        <td>Турбулентность</td>
+                        <td>Порывы детерминированны и меняют траекторию.</td>
+                    </tr>
+                    <tr>
+                        <td>ЦТ/ЦД/спин</td>
+                        <td>Параметры конструктора реально меняют дальность и высоту.</td>
+                    </tr>
+                    <tr>
+                        <td>ЦД впереди ЦТ</td>
+                        <td>Негативный статический запас ухудшает траекторию.</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <pre><code>npm test</code></pre>
+            </section>
+
+            <section id="book">
+                <h2>Сноски к локальной книге</h2>
+                <p>Связь с <code>Doc/габица_152.djvu</code> оформлена как сноски: книга дает библиографический контекст, исходные условия для проверки и ручные контрольные точки. Коэффициенты \(C_d(M)\), модель ЦТ/ЦД и турбулентность из нее не извлекаются.</p>
+                <ol class="footnotes">
+                    <li id="fn-book-title">По титульному листу: таблицы стрельбы для равнинных и горных условий 152-мм гаубицы 2А65 и 152-мм самоходной гаубицы 2С19, ТС N 187, издание 2005 г.; упомянуты снаряды ОФ45 и 3С6-1 (3С6).</li>
+                    <li id="fn-book-file">Локальный файл: <code>Doc/габица_152.djvu</code>. Для инструментов DjVuLibre создана ASCII-копия <code>Doc/Extracted/howitzer_152.djvu</code>; попытка извлечь текстовый слой дала пустой <code>Doc/Extracted/howitzer_152.txt</code>, поэтому страницы используются как изображения.</li>
+                    <li id="fn-book-charges">По предварительным страницам: документ перечисляет заряды и применимость для ОФ45 и 3С6/3С6-1. В приложении это используется только как проверка, что выбранный учебный пресет относится к правильному классу снаряда.</li>
+                    <li id="fn-book-v0">Первая найденная таблица прямой наводкой для ОФ45 на дальнобойном заряде дает контрольное начальное условие \(V_0 = 810\,\text{м/с}\). Это число используется как ориентир для верификации пресета, без переноса таблиц стрельбы в код.</li>
+                    <li id="fn-book-use">Ограничение использования: локальная книга подходит для внешних контрольных точек и ручной сверки результата, но не является источником аэродинамических коэффициентов, алгоритмов наведения, таблиц поправок или процедур управления огнем.</li>
+                </ol>
+            </section>
+
+            <section id="sources">
+                <h2>Список использованных работ</h2>
+                <ol class="sources">
+                    <li id="src-ts187">
+                        <span class="source-title">Таблицы стрельбы для равнинных и горных условий 152-мм гаубицы 2А65 и 152-мм самоходной гаубицы 2С19. ТС N 187. Издание 2005 г.</span>
+                        <span class="source-note">Локальный DJVU: <code>Doc/габица_152.djvu</code>; использован как внешний источник контрольных начальных условий и ручных сверочных точек.</span>
+                    </li>
+                    <li id="src-mccoy">
+                        <span class="source-title">McCoy, R. L. Modern Exterior Ballistics: The Launch and Flight Dynamics of Symmetric Projectiles. 2nd ed. Schiffer Publishing, 2012.</span>
+                        <span class="source-note">Использовано как базовая инженерная рамка для внешней баллистики, зависимости сопротивления от числа Маха и терминов устойчивости симметричного снаряда.</span>
+                    </li>
+                    <li id="src-atmosphere">
+                        <span class="source-title">U.S. Standard Atmosphere, 1976. NOAA, NASA, U.S. Air Force. U.S. Government Printing Office, 1976.</span>
+                        <span class="source-note">Использовано для формул стандартной атмосферы, плотности воздуха и скорости звука в диапазоне высот, нужном симулятору.</span>
+                    </li>
+                    <li id="src-butcher">
+                        <span class="source-title">Butcher, J. C. Numerical Methods for Ordinary Differential Equations. 3rd ed. Wiley, 2016.</span>
+                        <span class="source-note">Использовано как ссылка на численное интегрирование ОДУ и метод Рунге-Кутты 4-го порядка.</span>
+                    </li>
+                    <li id="src-anderson">
+                        <span class="source-title">Anderson, J. D. Fundamentals of Aerodynamics. 6th ed. McGraw-Hill Education, 2017.</span>
+                        <span class="source-note">Использовано для общей аэродинамической нотации: динамическое давление, безразмерные коэффициенты и связь сил с \(qA\).</span>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="limits">
+                <h2>Ограничения</h2>
+                <ul>
+                    <li>Модель не является полной 6-DOF: нет точной прецессии, деривации, вращения Земли, кривизны Земли и реального профиля ветра по высотам.</li>
+                    <li>Ось корпуса и угловая скорость интегрируются упрощенно; моменты инерции оценочные.</li>
+                    <li>\(C_d(M)\) учебный и не калиброван под конкретный снаряд.</li>
+                    <li>Нет рассеивания, износа ствола, температуры заряда, вариаций начальной скорости и работы взрывателя.</li>
+                    <li>Нет обратного решения по цели, прицеливания, таблиц поправок и fire-control процедур.</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

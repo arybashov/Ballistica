@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="app-shell">
+        <section class="viewport-panel" aria-label="3D сцена внешней баллистики">
+            <canvas id="sceneCanvas"></canvas>
+
+            <div class="topbar">
+                <div>
+                    <h1>Ballistica</h1>
+                    <p>Точечная модель внешней баллистики с сопротивлением воздуха</p>
+                </div>
+                <div class="top-actions">
+                    <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
+                    <div class="status-pill" id="runState">Готово</div>
+                </div>
+            </div>
+
+            <aside class="hud" aria-label="Полетные показатели">
+                <div class="hud-grid">
+                    <div>
+                        <span>Дальность</span>
+                        <strong id="hudRange">0 м</strong>
+                    </div>
+                    <div>
+                        <span>Высота</span>
+                        <strong id="hudAltitude">0 м</strong>
+                    </div>
+                    <div>
+                        <span>Скорость</span>
+                        <strong id="hudSpeed">0 м/с</strong>
+                    </div>
+                    <div>
+                        <span>Mach</span>
+                        <strong id="hudMach">0.00</strong>
+                    </div>
+                    <div>
+                        <span>Cd</span>
+                        <strong id="hudCd">0.000</strong>
+                    </div>
+                    <div>
+                        <span>Время</span>
+                        <strong id="hudTime">0.0 с</strong>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="legend" aria-label="Легенда траекторий">
+                <span><i class="legend-dot actual"></i>реальная</span>
+                <span><i class="legend-dot vacuum"></i>вакуум</span>
+                <span><i class="legend-dot target"></i>цель</span>
+            </div>
+        </section>
+
+        <aside class="control-panel" aria-label="Параметры симуляции">
+            <section class="panel-section">
+                <div class="section-title">
+                    <h2>Параметры запуска</h2>
+                    <select id="preset">
+                        <option value="shell152Of540Like">152 мм ОФ, учебный</option>
+                        <option value="mortar120Like">120 мм мина, учебный</option>
+                        <option value="vacuumCheck">Вакуумная проверка</option>
+                    </select>
+                </div>
+
+                <div class="control-grid">
+                    <label>Начальная скорость, м/с<input id="v0" type="number" min="1" max="2000" step="1"></label>
+                    <label>Угол, град<input id="angle" type="number" min="1" max="89" step="0.1"></label>
+                    <label>Азимут, град<input id="azimuth" type="number" min="-180" max="180" step="1"></label>
+                    <label>Высота старта, м<input id="h0" type="number" min="0" max="5000" step="1"></label>
+                    <label>Шаг RK4, с<input id="dt" type="number" min="0.002" max="0.1" step="0.002"></label>
+                    <label>Лимит времени, с<input id="maxTime" type="number" min="5" max="600" step="5"></label>
+                </div>
+
+                <div class="button-row">
+                    <button id="launchBtn" class="primary" type="button">Запуск</button>
+                    <button id="pauseBtn" type="button">Пауза</button>
+                    <button id="resetBtn" type="button">Сброс</button>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <h2>Среда</h2>
+                <div class="control-grid">
+                    <label>Ветер X, м/с<input id="windX" type="number" min="-80" max="80" step="1"></label>
+                    <label>Ветер Y, м/с<input id="windY" type="number" min="-80" max="80" step="1"></label>
+                    <label>Ветер Z, м/с<input id="windZ" type="number" min="-80" max="80" step="1"></label>
+                    <label>Турбулентность, м/с<input id="turbulence" type="number" min="0" max="60" step="0.5"></label>
+                    <label>Масштаб порывов, м<input id="turbulenceScale" type="number" min="25" max="3000" step="25"></label>
+                    <label>Множитель плотности<input id="densityScale" type="number" min="0" max="2" step="0.05"></label>
+                    <label>Цель по дальности, м<input id="targetRange" type="number" min="100" max="80000" step="100"></label>
+                </div>
+                <div class="button-row">
+                    <button id="findAngleBtn" type="button">Найти угол</button>
+                    <button id="snapTargetBtn" type="button">Цель = прогноз</button>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <h2>Масса и модель Cd</h2>
+                <div class="control-grid">
+                    <label>Масса, кг<input id="mass" type="number" min="0.1" max="2000" step="0.1"></label>
+                    <label>Форм-фактор<input id="formFactor" type="number" min="0" max="3" step="0.05"></label>
+                    <label>Постоянный Cd<input id="cdConst" type="number" min="0" max="2" step="0.01"></label>
+                </div>
+                <div class="segmented" id="cdModelGroup" role="radiogroup" aria-label="Модель коэффициента сопротивления">
+                    <button type="button" data-cd-model="machTable">Mach-таблица</button>
+                    <button type="button" data-cd-model="constant">Cd const</button>
+                    <button type="button" data-cd-model="none">Без воздуха</button>
+                </div>
+            </section>
+        </aside>
+
+        <section class="bottom-panel" aria-label="Конструктор и верификация">
+            <div class="tabs" role="tablist">
+                <button id="tabDesigner" class="active" type="button" role="tab" aria-selected="true">Конструктор</button>
+                <button id="tabVerify" type="button" role="tab" aria-selected="false">Верификация</button>
+            </div>
+
+            <div id="designerPanel" class="tab-panel active" role="tabpanel" aria-labelledby="tabDesigner">
+                <div class="designer-layout">
+                    <div class="constructor-controls">
+                        <label class="mini-control">Диаметр, м<input id="diameter" type="number" min="0.01" max="1" step="0.001"></label>
+                        <label class="mini-control">Длина, м<input id="length" type="number" min="0.02" max="5" step="0.01"></label>
+                        <label class="mini-control">ЦТ от носа, м<input id="cgFromNose" type="number" min="0" max="5" step="0.005"></label>
+                        <label class="mini-control">ЦД от носа, м<input id="cpFromNose" type="number" min="0" max="5" step="0.005"></label>
+                        <label class="mini-control">Спин, об/мин<input id="spinRpm" type="number" min="0" max="50000" step="100"></label>
+                    </div>
+                </div>
+                <div class="metric-strip">
+                    <div><span>Площадь сечения</span><strong id="metricArea">0 м²</strong></div>
+                    <div><span>Удельная масса</span><strong id="metricSectional">0 кг/м²</strong></div>
+                    <div><span>Макс. напор</span><strong id="metricMaxQ">0 кПа</strong></div>
+                    <div><span>Энергия удара</span><strong id="metricEnergy">0 МДж</strong></div>
+                    <div><span>Угол падения</span><strong id="metricImpactAngle">0°</strong></div>
+                    <div><span>Плечо ЦД-ЦТ</span><strong id="metricLever">0 м</strong></div>
+                    <div><span>Статический запас</span><strong id="metricStaticMargin">0%</strong></div>
+                    <div><span>Оценка момента</span><strong id="metricMoment">0 Нм</strong></div>
+                    <div><span>Спиновый индекс</span><strong id="metricSpinIndex">0</strong></div>
+                </div>
+                <div class="curve-row" aria-label="Кривая Cd по числу Mach">
+                    <div class="curve-readout" id="cdCurveReadout"></div>
+                </div>
+            </div>
+
+            <div id="verifyPanel" class="tab-panel" role="tabpanel" aria-labelledby="tabVerify">
+                <div class="metric-strip">
+                    <div><span>Прогноз с воздухом</span><strong id="verifyDragRange">0 м</strong></div>
+                    <div><span>Вакуумная дальность</span><strong id="verifyVacRange">0 м</strong></div>
+                    <div><span>Потеря дальности</span><strong id="verifyLoss">0%</strong></div>
+                    <div><span>Ошибка вакуум/RK4</span><strong id="verifyVacError">0%</strong></div>
+                    <div><span>Апогей</span><strong id="verifyApogee">0 м</strong></div>
+                </div>
+                <p id="verifyNote" class="note"></p>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="physics.js"></script>
+    <script src="scene.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
