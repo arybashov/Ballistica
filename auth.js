@@ -7,6 +7,11 @@
     const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
     const isLocal = window.location.protocol === 'file:' || LOCAL_HOSTS.has(window.location.hostname);
 
+    if (!isLocal && window.location.protocol === 'http:') {
+        window.location.replace('https://' + window.location.host + window.location.pathname + window.location.search + window.location.hash);
+        return;
+    }
+
     if (isLocal && !FORCE_AUTH) {
         return;
     }
