@@ -3,176 +3,392 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ballistica</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
+    <title>Ballistica / AI Полигон</title>
+    <script src="auth.js?v=20260705-https"></script>
+    <style>
+        :root {
+            --accent: #8a9bff;
+            --accent-glow: rgba(138, 155, 255, 0.8);
+            --bg-dark: #0a0a0a;
+            --bg-card: #111111;
+            --text: #f2f4ff;
+            --muted: #9aa3c0;
+        }
+
+        @font-face {
+            font-family: "Zenter SP Demo Black";
+            src: url("assets/fonts/ZenterSPDemo-Black.otf") format("opentype");
+            font-weight: 900;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #05060a;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(rgba(138,155,255,0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(138,155,255,0.08) 1px, transparent 1px),
+                radial-gradient(circle at 18% 22%, rgba(138,155,255,0.16), transparent 34%),
+                radial-gradient(circle at 78% 55%, rgba(242,95,92,0.10), transparent 32%),
+                #05060a;
+            background-size: 44px 44px, 44px 44px, auto, auto, auto;
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .splash-header,
+        .splash-footer,
+        .splash-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            background: rgba(10, 10, 10, 0.92);
+            backdrop-filter: blur(6px);
+        }
+
+        .splash-header {
+            top: 0;
+            height: 86px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 18px 40px;
+            border-bottom: 1px solid rgba(138,155,255,0.4);
+            box-shadow: 0 0 10px rgba(138,155,255,0.2);
+        }
+
+        .splash-logo {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .splash-title {
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #dde2ff;
+            text-align: center;
+        }
+
+        .splash-status {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 12px;
+            color: #9aa8ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .splash-status::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            background: #4eff4e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4eff4e;
+        }
+
+        .splash-left-title {
+            position: fixed;
+            left: 42px;
+            top: 150px;
+            z-index: 4;
+            max-width: 480px;
+            font-family: "Zenter SP Demo Black", system-ui, sans-serif;
+            font-size: clamp(38px, 5vw, 82px);
+            line-height: 0.92;
+            font-weight: 900;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+            color: rgba(235,238,255,0.95);
+            text-shadow: 0 0 28px rgba(138,155,255,0.35);
+            pointer-events: none;
+        }
+
+        .splash-ai-title {
+            position: fixed;
+            left: 44px;
+            bottom: 94px;
+            z-index: 4;
+            font-family: "Zenter SP Demo Black", system-ui, sans-serif;
+            font-size: 18px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--accent);
+            pointer-events: none;
+        }
+
+        .splash-content {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(190px, 242px));
+            justify-content: end;
+            align-items: center;
+            gap: 2px;
+            padding: 112px 22px 88px 60px;
+        }
+
+        .splash-content::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 5, 10, 0.45);
+            pointer-events: none;
+        }
+
+        .map-card {
+            position: relative;
+            z-index: 2;
+            height: min(72vh, 680px);
+            min-height: 430px;
+            background: var(--bg-card);
+            border: 2px solid rgba(138,155,255,0.5);
+            overflow: hidden;
+            cursor: pointer;
+            transition: filter 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            text-decoration: none;
+            clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
+            filter: drop-shadow(0 0 6px rgba(138,155,255,0.5)) drop-shadow(0 0 14px rgba(138,155,255,0.2));
+        }
+
+        .map-card:hover {
+            filter: drop-shadow(0 0 6px var(--accent-glow)) drop-shadow(0 0 18px var(--accent-glow));
+            border-color: transparent;
+            transform: translateY(-2px);
+        }
+
+        .map-bg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.82;
+        }
+
+        .map-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.84));
+        }
+
+        .map-info {
+            position: relative;
+            z-index: 2;
+            padding: 0 28px 42px 34px;
+        }
+
+        .map-tag {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            color: var(--accent);
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .map-name {
+            margin: 0 0 20px;
+            font-family: "Zenter SP Demo Black", system-ui, sans-serif;
+            font-size: 30px;
+            line-height: 1;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #e8eaff;
+        }
+
+        .map-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 116px;
+            height: 34px;
+            border: 1px solid rgba(138,155,255,0.75);
+            color: #dfe4ff;
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: rgba(10,10,10,0.52);
+        }
+
+        .splash-nav {
+            bottom: 40px;
+            height: 44px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            border-top: 1px solid rgba(138,155,255,0.24);
+            border-bottom: 1px solid rgba(138,155,255,0.18);
+        }
+
+        .splash-nav a {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            text-decoration: none;
+            transition: color 0.2s ease, text-shadow 0.2s ease;
+        }
+
+        .splash-nav a:hover,
+        .splash-nav a.active {
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        .splash-footer {
+            bottom: 0;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            gap: 18px;
+            padding: 0 28px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 11px;
+            color: #737b98;
+        }
+
+        .splash-footer span { color: #4eff4e; }
+
+        @media (max-width: 980px) {
+            body { overflow: auto; }
+            .splash-header,
+            .splash-footer,
+            .splash-nav,
+            .splash-left-title,
+            .splash-ai-title { position: relative; }
+            .splash-header {
+                height: auto;
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 18px;
+            }
+            .splash-title { text-align: left; font-size: 15px; }
+            .splash-left-title {
+                left: auto;
+                top: auto;
+                padding: 24px 18px 0;
+                font-size: 38px;
+            }
+            .splash-ai-title {
+                left: auto;
+                bottom: auto;
+                padding: 6px 18px 0;
+            }
+            .splash-content {
+                min-height: auto;
+                grid-template-columns: 1fr;
+                padding: 24px 18px;
+            }
+            .map-card {
+                clip-path: none;
+                height: 240px;
+                min-height: 240px;
+            }
+            .splash-nav {
+                height: auto;
+                flex-wrap: wrap;
+                padding: 14px 18px;
+            }
+            .splash-footer {
+                height: auto;
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                padding: 12px 18px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <main class="app-shell">
-        <section class="viewport-panel" aria-label="3D сцена внешней баллистики">
-            <canvas id="sceneCanvas"></canvas>
+    <header class="splash-header">
+        <div class="splash-logo">БАЛЛИСТИЧЕСКИЙ ТРЕНАЖЕР // ПОЛИГОН 3D</div>
+        <div class="splash-title">НЕЙРО БАЛЛИСТИЧЕСКОЕ ОБУЧЕНИЕ</div>
+        <div class="splash-status">Система активна</div>
+    </header>
 
-            <div class="topbar">
-                <div>
-                    <h1>Ballistica</h1>
-                    <p>Точечная модель внешней баллистики с сопротивлением воздуха</p>
-                </div>
-                <div class="top-actions">
-                    <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
-                    <div class="status-pill" id="runState">Готово</div>
-                    <a class="top-link relief-link" href="tactica.html">Tactica</a>
-                    <a class="top-link relief-link" href="network.html">Сеть</a>
-                    <a class="top-link relief-link" href="training.html">Обучение</a>
-                    <a class="top-link relief-link" href="nn-train.html">Тренировка</a>
-                </div>
+    <div class="splash-ai-title">AI ПОЛИГОН</div>
+    <div class="splash-left-title">
+        НЕЙРОСЕТЕВОЙ<br>
+        АРТИЛЛЕРИЙСКИЙ<br>
+        ТРЕНИРОВОЧНЫЙ<br>
+        ЦЕНТР
+    </div>
+
+    <main class="splash-content">
+        <a href="tactica.html" class="map-card">
+            <video class="map-bg" src="splash/transport%201.mp4" autoplay loop muted playsinline></video>
+            <div class="map-overlay"></div>
+            <div class="map-info">
+                <div class="map-tag">Класс 01</div>
+                <h2 class="map-name">Ракеты</h2>
+                <div class="map-btn">Tactica</div>
             </div>
+        </a>
 
-            <aside class="hud" aria-label="Полетные показатели">
-                <div class="hud-grid">
-                    <div>
-                        <span>Дальность</span>
-                        <strong id="hudRange">0 м</strong>
-                    </div>
-                    <div>
-                        <span>Высота</span>
-                        <strong id="hudAltitude">0 м</strong>
-                    </div>
-                    <div>
-                        <span>Скорость</span>
-                        <strong id="hudSpeed">0 м/с</strong>
-                    </div>
-                    <div>
-                        <span>Mach</span>
-                        <strong id="hudMach">0.00</strong>
-                    </div>
-                    <div>
-                        <span>Cd</span>
-                        <strong id="hudCd">0.000</strong>
-                    </div>
-                    <div>
-                        <span>Время</span>
-                        <strong id="hudTime">0.0 с</strong>
-                    </div>
-                </div>
-            </aside>
-
-            <div class="legend" aria-label="Легенда траекторий">
-                <span><i class="legend-dot actual"></i>реальная</span>
-                <span><i class="legend-dot vacuum"></i>вакуум</span>
-                <span><i class="legend-dot target"></i>цель</span>
+        <a href="tactica.html" class="map-card" style="position:relative;left:-7px">
+            <video class="map-bg" src="splash/land%201.mp4" autoplay loop muted playsinline></video>
+            <div class="map-overlay"></div>
+            <div class="map-info">
+                <div class="map-tag">Класс 02</div>
+                <h2 class="map-name">Артиллерия</h2>
+                <div class="map-btn">Полигон</div>
             </div>
-        </section>
+        </a>
 
-        <aside class="control-panel" aria-label="Параметры симуляции">
-            <section class="panel-section">
-                <div class="section-title">
-                    <h2>Параметры запуска</h2>
-                    <select id="preset">
-                        <option value="shell152Of540Like">152 мм ОФ, учебный</option>
-                        <option value="mortar120Like">120 мм мина, учебный</option>
-                        <option value="vacuumCheck">Вакуумная проверка</option>
-                    </select>
-                </div>
-
-                <div class="control-grid">
-                    <label>Начальная скорость, м/с<input id="v0" type="number" min="1" max="2000" step="1"></label>
-                    <label>Угол, град<input id="angle" type="number" min="1" max="89" step="0.1"></label>
-                    <label>Азимут, град<input id="azimuth" type="number" min="-180" max="180" step="1"></label>
-                    <label>Высота старта, м<input id="h0" type="number" min="0" max="5000" step="1"></label>
-                    <label>Шаг RK4, с<input id="dt" type="number" min="0.002" max="0.1" step="0.002"></label>
-                    <label>Лимит времени, с<input id="maxTime" type="number" min="5" max="600" step="5"></label>
-                </div>
-
-                <div class="button-row">
-                    <button id="launchBtn" class="primary" type="button">Запуск</button>
-                    <button id="pauseBtn" type="button">Пауза</button>
-                    <button id="resetBtn" type="button">Сброс</button>
-                </div>
-            </section>
-
-            <section class="panel-section">
-                <h2>Среда</h2>
-                <div class="control-grid">
-                    <label>Ветер X, м/с<input id="windX" type="number" min="-80" max="80" step="1"></label>
-                    <label>Ветер Y, м/с<input id="windY" type="number" min="-80" max="80" step="1"></label>
-                    <label>Ветер Z, м/с<input id="windZ" type="number" min="-80" max="80" step="1"></label>
-                    <label>Турбулентность, м/с<input id="turbulence" type="number" min="0" max="60" step="0.5"></label>
-                    <label>Масштаб порывов, м<input id="turbulenceScale" type="number" min="25" max="3000" step="25"></label>
-                    <label>Множитель плотности<input id="densityScale" type="number" min="0" max="2" step="0.05"></label>
-                    <label>Цель по дальности, м<input id="targetRange" type="number" min="100" max="80000" step="100"></label>
-                </div>
-                <div class="button-row">
-                    <button id="findAngleBtn" type="button">Найти угол</button>
-                    <button id="snapTargetBtn" type="button">Цель = прогноз</button>
-                </div>
-            </section>
-
-            <section class="panel-section">
-                <h2>Масса и модель Cd</h2>
-                <div class="control-grid">
-                    <label>Масса, кг<input id="mass" type="number" min="0.1" max="2000" step="0.1"></label>
-                    <label>Форм-фактор<input id="formFactor" type="number" min="0" max="3" step="0.05"></label>
-                    <label>Постоянный Cd<input id="cdConst" type="number" min="0" max="2" step="0.01"></label>
-                </div>
-                <div class="segmented" id="cdModelGroup" role="radiogroup" aria-label="Модель коэффициента сопротивления">
-                    <button type="button" data-cd-model="machTable">Mach-таблица</button>
-                    <button type="button" data-cd-model="constant">Cd const</button>
-                    <button type="button" data-cd-model="none">Без воздуха</button>
-                </div>
-            </section>
-        </aside>
-
-        <section class="bottom-panel" aria-label="Конструктор и верификация">
-            <div class="tabs" role="tablist">
-                <button id="tabDesigner" class="active" type="button" role="tab" aria-selected="true">Конструктор</button>
-                <button id="tabVerify" type="button" role="tab" aria-selected="false">Верификация</button>
+        <a href="nn-train.html" class="map-card" style="position:relative;left:-19px">
+            <video class="map-bg" src="splash/Bpla_boat%201.mp4" autoplay loop muted playsinline></video>
+            <div class="map-overlay"></div>
+            <div class="map-info">
+                <div class="map-tag">Класс 03</div>
+                <h2 class="map-name">Обучение</h2>
+                <div class="map-btn">Данные</div>
             </div>
-
-            <div id="designerPanel" class="tab-panel active" role="tabpanel" aria-labelledby="tabDesigner">
-                <div class="designer-layout">
-                    <div class="constructor-controls">
-                        <label class="mini-control">Диаметр, м<input id="diameter" type="number" min="0.01" max="1" step="0.001"></label>
-                        <label class="mini-control">Длина, м<input id="length" type="number" min="0.02" max="5" step="0.01"></label>
-                        <label class="mini-control">ЦТ от носа, м<input id="cgFromNose" type="number" min="0" max="5" step="0.005"></label>
-                        <label class="mini-control">ЦД от носа, м<input id="cpFromNose" type="number" min="0" max="5" step="0.005"></label>
-                        <label class="mini-control">Спин, об/мин<input id="spinRpm" type="number" min="0" max="50000" step="100"></label>
-                    </div>
-                </div>
-                <div class="metric-strip">
-                    <div><span>Площадь сечения</span><strong id="metricArea">0 м²</strong></div>
-                    <div><span>Удельная масса</span><strong id="metricSectional">0 кг/м²</strong></div>
-                    <div><span>Макс. напор</span><strong id="metricMaxQ">0 кПа</strong></div>
-                    <div><span>Энергия удара</span><strong id="metricEnergy">0 МДж</strong></div>
-                    <div><span>Угол падения</span><strong id="metricImpactAngle">0°</strong></div>
-                    <div><span>Плечо ЦД-ЦТ</span><strong id="metricLever">0 м</strong></div>
-                    <div><span>Статический запас</span><strong id="metricStaticMargin">0%</strong></div>
-                    <div><span>Оценка момента</span><strong id="metricMoment">0 Нм</strong></div>
-                    <div><span>Спиновый индекс</span><strong id="metricSpinIndex">0</strong></div>
-                </div>
-                <div class="curve-row" aria-label="Кривая Cd по числу Mach">
-                    <div class="curve-readout" id="cdCurveReadout"></div>
-                </div>
-            </div>
-
-            <div id="verifyPanel" class="tab-panel" role="tabpanel" aria-labelledby="tabVerify">
-                <div class="metric-strip">
-                    <div><span>Прогноз с воздухом</span><strong id="verifyDragRange">0 м</strong></div>
-                    <div><span>Вакуумная дальность</span><strong id="verifyVacRange">0 м</strong></div>
-                    <div><span>Потеря дальности</span><strong id="verifyLoss">0%</strong></div>
-                    <div><span>Ошибка вакуум/RK4</span><strong id="verifyVacError">0%</strong></div>
-                    <div><span>Апогей</span><strong id="verifyApogee">0 м</strong></div>
-                </div>
-                <p id="verifyNote" class="note"></p>
-            </div>
-        </section>
+        </a>
     </main>
 
-    <footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer>
+    <nav class="splash-nav">
+        <a href="tactica.html" class="active">Tactica</a>
+        <a href="network.html">Нейросеть</a>
+        <a href="training.html">Обучение</a>
+        <a href="nn-train.html">Тренировка</a>
+        <a href="whitepapers.html">Whitepapers</a>
+    </nav>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="physics.js"></script>
-    <script src="scene.js"></script>
-    <script src="app.js"></script>
+    <footer class="splash-footer">
+        <div>Commercial license only - "Expoteh Line"</div>
+        <div>Physics Engine: <span>OK</span></div>
+        <div>RL Core: <span>LOADED</span></div>
+        <div>Data Link: <span>ACTIVE</span></div>
+        <div>Version: <span>1.0.2</span></div>
+    </footer>
 </body>
 </html>
-

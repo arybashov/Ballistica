@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ballistica / Tactica</title>
     <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
+    <script src="auth.js?v=20260705-https"></script>
     <style>
         body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
         #sceneCanvas { display: block; width: 100vw; height: 100vh; }
@@ -69,7 +69,6 @@
         </div>
         <div class="top-actions">
             <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
-            <div class="status-pill" id="runState">Готово</div>
             <a class="top-link" href="tactica.html">Tactica</a>
             <a class="top-link" href="network.html">Сеть</a>
             <a class="top-link" href="training.html">Обучение</a>
@@ -124,6 +123,10 @@
     <div class="orient-panel" id="targetLib" style="top:auto;left:auto">
         <h2>Библиотека целей</h2>
         <div style="display:flex;gap:8px">
+            <div class="target-card" data-target="ball" style="cursor:pointer;border:2px solid transparent;border-radius:6px;padding:4px;text-align:center">
+                <canvas id="thumbBall" width="80" height="60" style="display:block;border-radius:4px;background:#1a1d22"></canvas>
+                <span style="font-size:10px;color:#889">Шар</span>
+            </div>
             <div class="target-card" data-target="factory" style="cursor:pointer;border:2px solid transparent;border-radius:6px;padding:4px;text-align:center">
                 <canvas id="thumbFactory" width="80" height="60" style="display:block;border-radius:4px;background:#1a1d22"></canvas>
                 <span style="font-size:10px;color:#889">Завод</span>
@@ -174,6 +177,7 @@
         <label>Цель (м)<input id="targetRange" type="number" value="15000"></label>
         <button id="findAngleBtn" title="Подобрать угол для попадания в цель на заданной дальности">Найти угол</button>
         <button id="snapTargetBtn" title="Установить дальность цели по текущему прогнозу попадания">Цель = прогноз</button>
+        <div class="info" id="nnAimStatus">Нейросеть: проверка...</div>
     </div>
 
     <div class="panel" id="draggablePanel">
@@ -215,6 +219,7 @@
     }
     </script>
     <script src="physics.js"></script>
+    <script src="nn.js"></script>
     <script src="terrain.js"></script>
     <script type="module">
         import * as THREE from 'three';
@@ -289,6 +294,10 @@
             let heightGrid = null;       // { data, size, worldSize, half, scale }
             let trajectoryLine = null;
             let previewLine = null;
+            let trajectoryTube = null;
+            let previewTube = null;
+            let nnTrajectoryLine = null;
+            let nnTrajectoryTube = null;
             let trajectoryHistory = [];
             let targetMarker = null;
             let projectileDot = null;
@@ -297,6 +306,7 @@
             let impactLabel = null;
             let shotCounter = 0;
             let targetModels = [];
+            let targetPlacementToken = 0;
             let selectedTarget = null;
             let targetWorld = null;
             let shot = null;
@@ -304,9 +314,19 @@
             let shotPaused = false;
             let shotTime = 0;
             let solvingTarget = false;
+            let pendingTargetSolve = 0;
             const DT_SIM = 0.02;
+            const SOLVER_DT = 0.04;
+            const TARGET_SOLVE_DELAY_MS = 2000;
             let terrainScale = 1.0;
+
+            function setRunState(text) {
+                const el = document.getElementById('runState');
+                if (el) el.textContent = text;
+            }
             const gunOffset = { x: 0, z: 0 };
+            const nnAimStatus = document.getElementById('nnAimStatus');
+            let trainedAimModel = null;
 
             function buildHeightGrid(mesh) {
                 const gridSize = 512;
@@ -371,7 +391,175 @@
             }
 
             function shotToWorldPoint(p) {
-                return new THREE.Vector3(p.x + gunOffset.x, p.y + 8, p.z + gunOffset.z);
+                return new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z);
+            }
+
+            function normalizeDeg(deg) {
+                return ((deg % 360) + 360) % 360;
+            }
+
+            function readShotParams(overrides = {}) {
+                const v0 = Number(document.getElementById('v0').value) || 655;
+                const angle = Number(document.getElementById('angle').value) || 45;
+                const h0 = syncGunToTerrain();
+                const azimuth = Number(document.getElementById('azimuth').value) || 0;
+                const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
+                const mass = Number(document.getElementById('mass').value) || 43.5;
+                const formFactor = Number(document.getElementById('formFactor').value) || 0.92;
+                const cdConst = Number(document.getElementById('cdConst').value) || 0.25;
+                const windX = Number(document.getElementById('windX').value) || 0;
+                const windY = Number(document.getElementById('windY').value) || 0;
+                const windZ = Number(document.getElementById('windZ').value) || 0;
+                const turbulence = Number(document.getElementById('turbulence').value) || 0;
+                const dt = Number(document.getElementById('dt').value) || 0.02;
+                const maxTime = Number(document.getElementById('maxTime').value) || 300;
+                return {
+                    v0, angle, h0, azimuth, mass, formFactor, cdConst, cdModel,
+                    maxTime, dt, windX, windY, windZ, turbulence,
+                    turbulenceScale: 500, densityScale: 1, ...overrides
+                };
+            }
+
+            function clamp01(v) {
+                return Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
+            }
+
+            function loadTrainedAimModel() {
+                if (!window.BallisticsNN || !window.NeuralNetwork) {
+                    return { ok: false, reason: 'модуль не загружен' };
+                }
+                const bundle = window.BallisticsNN.loadDirectBundle('direct_ballistics');
+                if (!bundle || !bundle.nn || !bundle.stats) {
+                    return { ok: false, reason: 'модель не обучена' };
+                }
+                const inputKeys = bundle.stats.inputKeys || [];
+                const outputKeys = bundle.stats.outputKeys || [];
+                const hasTerrainPosition = inputKeys.includes('gunX') && inputKeys.includes('gunZ');
+                const layerInput = bundle.nn.layers && bundle.nn.layers[0];
+                const rangeIndex = outputKeys.indexOf('range');
+                if (!hasTerrainPosition || layerInput !== inputKeys.length || rangeIndex < 0) {
+                    return { ok: false, reason: 'модель устарела' };
+                }
+                return { ok: true, bundle, inputKeys, outputKeys, rangeIndex };
+            }
+
+            function updateTrainedAimStatus(text) {
+                if (!nnAimStatus) return;
+                if (text) {
+                    nnAimStatus.textContent = text;
+                    return;
+                }
+                if (trainedAimModel && trainedAimModel.ok) {
+                    const metrics = trainedAimModel.bundle.metrics;
+                    if (metrics && Number.isFinite(metrics.avgPct)) {
+                        const caution = metrics.avgPct > 20 ? ', только старт для физики' : '';
+                        nnAimStatus.textContent = 'Нейросеть: загружена, средн. ошибка ' + metrics.avgPct.toFixed(1) + '%' + caution;
+                    } else {
+                        nnAimStatus.textContent = 'Нейросеть: загружена';
+                    }
+                } else {
+                    nnAimStatus.textContent = 'Нейросеть: ' + ((trainedAimModel && trainedAimModel.reason) || 'нет модели');
+                }
+            }
+
+            function predictTrainedRange(base, angle, azimuth) {
+                if (!trainedAimModel || !trainedAimModel.ok) return null;
+                const stats = trainedAimModel.bundle.stats;
+                const sample = {
+                    v0: base.v0,
+                    angle,
+                    azimuth: normalizeDeg(azimuth),
+                    h0: base.h0,
+                    windX: base.windX,
+                    windY: base.windY,
+                    windZ: base.windZ,
+                    mass: base.mass,
+                    gunX: gunOffset.x,
+                    gunZ: gunOffset.z
+                };
+                const input = trainedAimModel.inputKeys.map(function(k) {
+                    const min = stats.mins[k];
+                    const max = stats.maxs[k];
+                    const span = max - min;
+                    return span > 1e-9 ? clamp01((sample[k] - min) / span) : 0;
+                });
+                const output = trainedAimModel.bundle.nn.predict(input);
+                const denorm = window.BallisticsNN.denormalize(output, stats.mins, stats.maxs, trainedAimModel.outputKeys);
+                const range = denorm[trainedAimModel.rangeIndex];
+                return Number.isFinite(range) ? range : null;
+            }
+
+            function estimateAngleWithTrainedModel(base, targetRange, azimuth) {
+                if (!trainedAimModel || !trainedAimModel.ok) return null;
+                let best = null;
+                function probe(angle) {
+                    const range = predictTrainedRange(base, angle, azimuth);
+                    if (range == null) return;
+                    const error = Math.abs(range - targetRange);
+                    if (!best || error < best.error) best = { angle, azimuth: normalizeDeg(azimuth), predictedRange: range, error };
+                }
+                for (let a = 5; a <= 85; a += 1) probe(a);
+                if (best) {
+                    const center = best.angle;
+                    for (let a = Math.max(5, center - 3); a <= Math.min(85, center + 3) + 1e-9; a += 0.25) probe(a);
+                }
+                return best;
+            }
+
+            function applyTrainedSeed(seed, targetRange, base) {
+                if (!seed) return;
+                setAzimuth(seed.azimuth);
+                document.getElementById('angle').value = Math.round(seed.angle * 100) / 100;
+                updateTrainedAimStatus('Нейросеть: угол ' + seed.angle.toFixed(2) + '°, прогноз ' + Math.round(seed.predictedRange) + ' м / цель ' + Math.round(targetRange) + ' м');
+                if (base) showNnSeedTrajectory(base, seed);
+                rebuildPreview();
+            }
+
+            trainedAimModel = loadTrainedAimModel();
+            updateTrainedAimStatus();
+
+            function runAim(paramsBase, angle, azimuth, dtOverride) {
+                const p = { ...paramsBase, angle, azimuth: normalizeDeg(azimuth), dt: dtOverride || paramsBase.dt };
+                const s = new Projectile(p.v0, p.angle, p.h0, p.azimuth, p);
+                s.run(p.maxTime || 300, p.dt || 0.02);
+                return s;
+            }
+
+            function yieldUi() {
+                return new Promise(function(resolve) { setTimeout(resolve, 0); });
+            }
+
+            function evaluateAim(paramsBase, angle, azimuth, targetLocal, dtOverride) {
+                const s = runAim(paramsBase, angle, azimuth, dtOverride);
+                const hit = s.trail[s.trail.length - 1] || { x: 0, y: 0, z: 0 };
+                const dx = hit.x - targetLocal.x;
+                const dy = hit.y - targetLocal.y;
+                const dz = hit.z - targetLocal.z;
+                return { angle, azimuth: normalizeDeg(azimuth), error: Math.hypot(dx, dy, dz), hit };
+            }
+
+            async function refineAngle(paramsBase, targetLocal, azimuth, center, span, step, dtOverride, solveId = 0) {
+                const start = center == null ? 5 : Math.max(5, center - span);
+                const end = center == null ? 85 : Math.min(85, center + span);
+                let best = null;
+                for (let a = start; a <= end + 1e-9; a += step) {
+                    if (solveId && solveId !== pendingTargetSolve) return best;
+                    const candidate = evaluateAim(paramsBase, a, azimuth, targetLocal, dtOverride);
+                    if (!best || candidate.error < best.error) best = candidate;
+                    await yieldUi();
+                }
+                return best;
+            }
+
+            async function refineAzimuth(paramsBase, targetLocal, angle, center, span, step, dtOverride, solveId = 0) {
+                let best = null;
+                for (let offset = -span; offset <= span + 1e-9; offset += step) {
+                    if (solveId && solveId !== pendingTargetSolve) return best;
+                    const candidate = evaluateAim(paramsBase, angle, center + offset, targetLocal, dtOverride);
+                    if (!best || candidate.error < best.error) best = candidate;
+                    await yieldUi();
+                }
+                return best;
             }
 
             function terrainHeightForShot(localX, localZ) {
@@ -406,18 +594,22 @@
             window._terrainHeightFn = function(x, z) { return terrainHeightForShot(x, z); };
 
             function createTrajectoryLine() {
-                trajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00aaff, linewidth: 3, transparent: true, opacity: 1 }));
-                previewLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x24c8ff, linewidth: 3.5, transparent: true, opacity: 1 }));
+                trajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00aaff, linewidth: 6, transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
+                previewLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x24c8ff, linewidth: 7, transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
                 trajectoryLine.renderOrder = 20;
                 previewLine.renderOrder = 21;
                 scene.add(trajectoryLine);
                 scene.add(previewLine);
+                nnTrajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xff3b30, linewidth: 7, transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
+                nnTrajectoryLine.renderOrder = 24;
+                scene.add(nnTrajectoryLine);
                 targetMarker = new THREE.Group();
-                const tRing = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.18, 8, 42), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
+                const tBall = new THREE.Mesh(new THREE.SphereGeometry(2.8, 24, 16), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
+                const tRing = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.55, 8, 56), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
                 tRing.rotation.x = Math.PI / 2;
-                const tPost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 9, 10), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
-                tPost.position.y = 4.5;
-                targetMarker.add(tRing, tPost);
+                const tPost = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 13, 12), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
+                tPost.position.y = 3.0;
+                targetMarker.add(tBall, tRing, tPost);
                 scene.add(targetMarker);
                 // Gun position marker
                 gunMarker = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4cc9a4 }));
@@ -447,75 +639,140 @@
                 scene.add(projectileDot);
             }
 
+            function disposeMesh(mesh) {
+                if (!mesh) return;
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material.forEach(function(m) { m.dispose(); });
+                    else mesh.material.dispose();
+                }
+            }
+
+            function setLineGeometry(line, pts) {
+                if (!line) return;
+                line.geometry.dispose();
+                line.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+            }
+
+            function setTrajectoryTube(mesh, pts, color, radius, renderOrder) {
+                if (mesh) {
+                    scene.remove(mesh);
+                    disposeMesh(mesh);
+                }
+                if (!pts || pts.length < 2) return null;
+                const sampled = pts.filter(function(_, i) { return i % 4 === 0; });
+                const last = pts[pts.length - 1];
+                if (sampled[sampled.length - 1] !== last) sampled.push(last);
+                if (sampled.length < 2) return null;
+                const curve = new THREE.CatmullRomCurve3(sampled);
+                const geometry = new THREE.TubeGeometry(curve, Math.min(260, Math.max(8, sampled.length * 2)), radius, 8, false);
+                const material = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1, depthTest: false, depthWrite: false });
+                const tube = new THREE.Mesh(geometry, material);
+                tube.renderOrder = renderOrder;
+                scene.add(tube);
+                return tube;
+            }
+
+            function setPreviewPoints(pts) {
+                setLineGeometry(previewLine, pts);
+                previewTube = setTrajectoryTube(previewTube, pts, 0x24c8ff, 18, 22);
+            }
+
+            function setTrajectoryPoints(pts) {
+                setLineGeometry(trajectoryLine, pts);
+                trajectoryTube = setTrajectoryTube(trajectoryTube, pts, 0x00aaff, 20, 23);
+            }
+
+            function setNnTrajectoryPoints(pts) {
+                setLineGeometry(nnTrajectoryLine, pts);
+                nnTrajectoryTube = setTrajectoryTube(nnTrajectoryTube, pts, 0xff3b30, 22, 25);
+            }
+
+            function clearHud() {
+                document.getElementById('hudRange').textContent = 'Дальность —';
+                document.getElementById('hudAltitude').textContent = 'Высота —';
+                document.getElementById('hudSpeed').textContent = 'Скорость —';
+                document.getElementById('hudTime').textContent = 'Время —';
+            }
+
+            function maxTrailAltitude(s) {
+                if (!s || !s.trail || !s.trail.length) return 0;
+                return s.trail.reduce(function(max, p) { return Math.max(max, p.y || 0); }, 0);
+            }
+
+            function updateHudFromShot(s, useMaxAltitude) {
+                if (!s) {
+                    clearHud();
+                    return;
+                }
+                const altitude = useMaxAltitude ? maxTrailAltitude(s) : Math.max(0, s.y || 0);
+                document.getElementById('hudRange').textContent = 'Дальность ' + Math.round(s.getHorizontalRange()) + ' м';
+                document.getElementById('hudAltitude').textContent = 'Высота ' + Math.round(Math.max(0, altitude)) + ' м';
+                document.getElementById('hudSpeed').textContent = 'Скорость ' + Math.round(s.getSpeed()) + ' м/с';
+                document.getElementById('hudTime').textContent = 'Время ' + s.t.toFixed(1) + ' с';
+            }
+
+            function clearNnTrajectory() {
+                setLineGeometry(nnTrajectoryLine, []);
+                if (nnTrajectoryTube) {
+                    scene.remove(nnTrajectoryTube);
+                    disposeMesh(nnTrajectoryTube);
+                    nnTrajectoryTube = null;
+                }
+            }
+
+            function showNnSeedTrajectory(base, seed) {
+                if (!seed) {
+                    clearNnTrajectory();
+                    return;
+                }
+                const s = runAim(base, seed.angle, seed.azimuth, base.dt);
+                setNnTrajectoryPoints(s.trail.map(shotToWorldPoint));
+            }
+
             function rebuildPreview() {
-                const v0 = Number(document.getElementById('v0').value) || 655;
-                const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = syncGunToTerrain();
-                const azimuth = Number(document.getElementById('azimuth').value) || 0;
-                const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
-                const mass = Number(document.getElementById('mass').value) || 43.5;
-                const formFactor = Number(document.getElementById('formFactor').value) || 0.92;
-                const cdConst = Number(document.getElementById('cdConst').value) || 0.25;
-                const windX = Number(document.getElementById('windX').value) || 0;
-                const windY = Number(document.getElementById('windY').value) || 0;
-                const windZ = Number(document.getElementById('windZ').value) || 0;
-                const p = { v0, angle, h0, azimuth, mass, formFactor, cdConst, cdModel, maxTime: 300, dt: 0.02, windX, windY, windZ, turbulence: 0, turbulenceScale: 500, densityScale: 1 };
+                const p = readShotParams();
                 try {
-                    const airShot = new Projectile(v0, angle, h0, azimuth, p);
+                    const airShot = new Projectile(p.v0, p.angle, p.h0, p.azimuth, p);
                     airShot.run(p.maxTime, p.dt);
                     if (previewLine) {
                         const pts = airShot.trail.map(shotToWorldPoint);
-                        previewLine.geometry.dispose();
-                        previewLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+                        setPreviewPoints(pts);
                     }
-                    // Save to history
-                    // Vacuum trajectory — not rendered
-                    const vacHit = analyticVacuumImpact(v0, angle, h0);
-                    // Target marker at predicted impact
-                    if (targetMarker && airShot.trail.length > 0) {
+                    updateHudFromShot(airShot, true);
+                    if (targetMarker && targetWorld) {
+                        targetMarker.position.set(targetWorld.x, targetWorld.y, targetWorld.z);
+                        targetMarker.visible = true;
+                    } else if (targetMarker && airShot.trail.length > 0) {
                         const imp = airShot.trail[airShot.trail.length - 1];
                         targetMarker.position.copy(shotToWorldPoint(imp));
                         targetMarker.visible = true;
                     }
                 } catch(err) {
                     console.error('Preview error:', err);
+                    clearHud();
                 }
             }
 
             function launchShot() {
                 if (shotRunning && !shotPaused) { resetShot(); return; }
-                if (shotPaused) { shotPaused = false; document.getElementById('runState').textContent = 'Полет'; return; }
-                const v0 = Number(document.getElementById('v0').value) || 655;
-                const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = syncGunToTerrain();
-                const effectiveH0 = h0;
-                const azimuth = Number(document.getElementById('azimuth').value) || 0;
-                const windX = Number(document.getElementById('windX').value) || 0;
-                const windY = Number(document.getElementById('windY').value) || 0;
-                const windZ = Number(document.getElementById('windZ').value) || 0;
-                const turbulence = Number(document.getElementById('turbulence').value) || 0;
-                const mass = Number(document.getElementById('mass').value) || 43.5;
-                const formFactor = Number(document.getElementById('formFactor').value) || 0.92;
-                const cdConst = Number(document.getElementById('cdConst').value) || 0.25;
-                const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
-                const dt = Number(document.getElementById('dt').value) || 0.02;
-                const maxTime = Number(document.getElementById('maxTime').value) || 300;
-                const densityScale = 1.0;
-                const turbulenceScale = 500;
-                Object.assign(params, { v0, angle, h0: effectiveH0, azimuth, windX, windY, windZ, turbulence, turbulenceScale, densityScale, mass, formFactor, cdConst, cdModel, dt, maxTime });
-                shot = new Projectile(v0, angle, effectiveH0, azimuth, params);
-                console.log('Launch:', v0, angle, effectiveH0, azimuth, 'trail start:', shot.trail.length);
+                if (shotPaused) { shotPaused = false; setRunState('Полет'); return; }
+                const shotParams = readShotParams();
+                Object.assign(params, shotParams);
+                shot = new Projectile(shotParams.v0, shotParams.angle, shotParams.h0, shotParams.azimuth, params);
+                console.log('Launch:', shotParams.v0, shotParams.angle, shotParams.h0, shotParams.azimuth, 'trail start:', shot.trail.length);
                 shotRunning = true;
                 shotPaused = false;
                 shotTime = 0;
                 shotCounter++;
                 if (impactLabel) { scene.remove(impactLabel); impactLabel = null; }
-                document.getElementById('runState').textContent = 'Полет';
+                setRunState('Полет');
                 document.getElementById('launchBtn').classList.add('running');
                 document.getElementById('launchBtn').textContent = 'Стоп';
-                targetMarker.visible = false;
-                if (previewLine) previewLine.geometry.setFromPoints([]);
-                if (trajectoryLine) trajectoryLine.geometry.setFromPoints([]);
+                if (targetMarker && !targetWorld) targetMarker.visible = false;
+                setPreviewPoints([]);
+                setTrajectoryPoints([]);
+                clearNnTrajectory();
             }
 
             function resetShot() {
@@ -524,10 +781,10 @@
                 shot = null;
                 shotTime = 0;
                 shotCounter = 0;
-                document.getElementById('runState').textContent = 'Готово';
+                setRunState('Готово');
                 document.getElementById('launchBtn').classList.remove('running');
                 document.getElementById('launchBtn').textContent = 'Старт';
-                if (trajectoryLine) trajectoryLine.geometry.setFromPoints([]);
+                setTrajectoryPoints([]);
                 if (projectileDot) projectileDot.visible = false;
                 if (impactLabel) { scene.remove(impactLabel); impactLabel = null; }
                 // Clear history
@@ -539,7 +796,7 @@
             function togglePause() {
                 if (!shot || shot.landed) return;
                 shotPaused = !shotPaused;
-                document.getElementById('runState').textContent = shotPaused ? 'Пауза' : 'Полет';
+                setRunState(shotPaused ? 'Пауза' : 'Полет');
             }
 
             function applyPreset(key) {
@@ -556,51 +813,90 @@
                 rebuildPreview();
             }
 
-            function findAngleForTarget() {
+            async function findAngleForTarget(solveId = ++pendingTargetSolve) {
                 if (solvingTarget) return;
                 solvingTarget = true;
-                const targetRange = Number(document.getElementById('targetRange').value) || 15000;
-                const v0 = Number(document.getElementById('v0').value) || 655;
-                const h0 = syncGunToTerrain();
-                if (targetWorld) {
-                    const targetAzimuth = bearingDegToWorldPoint(targetWorld.x, targetWorld.z);
-                    const targetLocalX = targetWorld.x - gunOffset.x;
-                    const targetLocalZ = targetWorld.z - gunOffset.z;
-                    setAzimuth(targetAzimuth);
-                    let bestTerrainAngle = 45, bestTerrainDiff = Infinity;
-                    for (let a = 5; a <= 85; a += 0.5) {
-                        const p = { ...params, angle: a, h0, v0, azimuth: targetAzimuth };
-                        const s = new Projectile(v0, a, h0, targetAzimuth, p);
-                        s.run(p.maxTime || 300, p.dt || 0.02);
-                        const hit = s.trail[s.trail.length - 1] || { x: 0, z: 0 };
-                        const diff = Math.hypot(hit.x - targetLocalX, hit.z - targetLocalZ);
-                        if (diff < bestTerrainDiff) { bestTerrainDiff = diff; bestTerrainAngle = a; }
+                try {
+                    const base = readShotParams();
+                    clearNnTrajectory();
+                    const targetRange = Number(document.getElementById('targetRange').value) || 15000;
+                    const solveDt = Math.max(base.dt, SOLVER_DT);
+                    if (targetWorld) {
+                        const targetAzimuth = bearingDegToWorldPoint(targetWorld.x, targetWorld.z);
+                        const targetLocal = {
+                            x: targetWorld.x - gunOffset.x,
+                            y: targetWorld.y,
+                            z: targetWorld.z - gunOffset.z
+                        };
+                        const windMag = Math.hypot(base.windX, base.windZ);
+                        const azimuthSpan = Math.min(45, Math.max(12, windMag * 0.6));
+                        const targetDistance = Math.hypot(targetLocal.x, targetLocal.z);
+                        const nnSeed = estimateAngleWithTrainedModel(base, targetDistance, targetAzimuth);
+                        if (nnSeed) applyTrainedSeed(nnSeed, targetDistance, base);
+                        let best = nnSeed
+                            ? await refineAngle(base, targetLocal, targetAzimuth, nnSeed.angle, 8, 0.5, solveDt, solveId)
+                            : await refineAngle(base, targetLocal, targetAzimuth, null, 0, 1, solveDt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        if (nnSeed && best.error > Math.max(250, targetDistance * 0.08)) {
+                            const fullBest = await refineAngle(base, targetLocal, targetAzimuth, null, 0, 1, solveDt, solveId);
+                            if (!fullBest || solveId !== pendingTargetSolve) return;
+                            if (fullBest.error < best.error) best = fullBest;
+                        }
+                        best = await refineAngle(base, targetLocal, targetAzimuth, best.angle, 1.2, 0.2, solveDt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        best = await refineAzimuth(base, targetLocal, best.angle, targetAzimuth, azimuthSpan, 1, solveDt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        best = await refineAngle(base, targetLocal, best.azimuth, best.angle, 3, 0.25, solveDt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        best = await refineAzimuth(base, targetLocal, best.angle, best.azimuth, 2, 0.2, solveDt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        best = await refineAngle(base, targetLocal, best.azimuth, best.angle, 0.8, 0.05, base.dt, solveId);
+                        if (!best || solveId !== pendingTargetSolve) return;
+                        setAzimuth(best.azimuth);
+                        document.getElementById('angle').value = Math.round(best.angle * 100) / 100;
+                        if (nnSeed) {
+                            updateTrainedAimStatus('Нейросеть: старт ' + nnSeed.angle.toFixed(2) + '°, физика ' + best.angle.toFixed(2) + '°');
+                        }
+                        simStatus.textContent = 'Цель: ' + document.getElementById('targetRange').value + ' м';
+                        rebuildPreview();
+                        return;
                     }
-                    document.getElementById('angle').value = Math.round(bestTerrainAngle * 10) / 10;
+
+                    const azimuth = base.azimuth || 0;
+                    const targetLocal = {
+                        x: targetRange * Math.cos(azimuth * Math.PI / 180),
+                        y: terrainHeightForShot(targetRange * Math.cos(azimuth * Math.PI / 180), targetRange * Math.sin(azimuth * Math.PI / 180)),
+                        z: targetRange * Math.sin(azimuth * Math.PI / 180)
+                    };
+                    const nnSeed = estimateAngleWithTrainedModel(base, targetRange, azimuth);
+                    if (nnSeed) applyTrainedSeed(nnSeed, targetRange, base);
+                    let best = nnSeed
+                        ? await refineAngle(base, targetLocal, azimuth, nnSeed.angle, 8, 0.5, solveDt, solveId)
+                        : await refineAngle(base, targetLocal, azimuth, null, 0, 1, solveDt, solveId);
+                    if (!best || solveId !== pendingTargetSolve) return;
+                    if (nnSeed && best.error > Math.max(250, targetRange * 0.08)) {
+                        const fullBest = await refineAngle(base, targetLocal, azimuth, null, 0, 1, solveDt, solveId);
+                        if (!fullBest || solveId !== pendingTargetSolve) return;
+                        if (fullBest.error < best.error) best = fullBest;
+                    }
+                    best = await refineAngle(base, targetLocal, azimuth, best.angle, 1.2, 0.2, solveDt, solveId);
+                    if (!best || solveId !== pendingTargetSolve) return;
+                    best = await refineAngle(base, targetLocal, azimuth, best.angle, 0.8, 0.05, base.dt, solveId);
+                    if (best && solveId === pendingTargetSolve) {
+                        document.getElementById('angle').value = Math.round(best.angle * 100) / 100;
+                        if (nnSeed) {
+                            updateTrainedAimStatus('Нейросеть: старт ' + nnSeed.angle.toFixed(2) + '°, физика ' + best.angle.toFixed(2) + '°');
+                        }
+                    }
                     rebuildPreview();
+                } finally {
                     solvingTarget = false;
-                    return;
                 }
-                let bestAngle = 45, bestDiff = Infinity;
-                for (let a = 5; a <= 85; a += 0.5) {
-                    const p = { ...params, angle: a, h0, v0 };
-                    const s = new Projectile(v0, a, h0, params.azimuth || 0, p);
-                    s.run(p.maxTime || 300, p.dt || 0.02);
-                    const diff = Math.abs(s.getHorizontalRange() - targetRange);
-                    if (diff < bestDiff) { bestDiff = diff; bestAngle = a; }
-                }
-                document.getElementById('angle').value = Math.round(bestAngle * 10) / 10;
-                rebuildPreview();
-                solvingTarget = false;
             }
 
             function setTargetToPrediction() {
-                const v0 = Number(document.getElementById('v0').value) || 655;
-                const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = syncGunToTerrain();
-                const p = { ...params, angle, h0, v0 };
-                const s = new Projectile(v0, angle, h0, params.azimuth || 0, p);
-                s.run(p.maxTime || 300, p.dt || 0.02);
+                const p = readShotParams();
+                const s = runAim(p, p.angle, p.azimuth, p.dt);
                 document.getElementById('targetRange').value = Math.round(s.getHorizontalRange());
                 rebuildPreview();
             }
@@ -615,8 +911,7 @@
                 // Update trajectory line
                 if (shot.trail.length >= 2 && trajectoryLine) {
                     const pts = shot.trail.map(shotToWorldPoint);
-                    trajectoryLine.geometry.dispose();
-                    trajectoryLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+                    setTrajectoryPoints(pts);
                 }
                 // Update projectile dot
                 if (projectileDot && shot.trail.length > 0) {
@@ -649,18 +944,12 @@
                     impactLabel.position.copy(shotToWorldPoint({ x: p.x, y: p.y + 60, z: p.z }));
                     scene.add(impactLabel);
                     shotRunning = false;
-                    document.getElementById('runState').textContent = 'Попадание';
+                    setRunState('Попадание');
                     document.getElementById('launchBtn').classList.remove('running');
                 document.getElementById('launchBtn').textContent = 'Старт';
                     setTimeout(rebuildPreview, 500);
                 }
-                // HUD
-                if (shot) {
-                    document.getElementById('hudRange').textContent = 'Дальность ' + Math.round(shot.getHorizontalRange()) + ' м';
-                    document.getElementById('hudAltitude').textContent = 'Высота ' + Math.round(Math.max(0, shot.y)) + ' м';
-                    document.getElementById('hudSpeed').textContent = 'Скорость ' + Math.round(shot.getSpeed()) + ' м/с';
-                    document.getElementById('hudTime').textContent = 'Время ' + shot.t.toFixed(1) + ' с';
-                }
+                updateHudFromShot(shot, false);
             }
 
             const orbit = { yaw: -2.36, pitch: 0.6, distance: 20000, target: new THREE.Vector3(0, 500, 0), minDist: 100, maxDist: 150000 };
@@ -749,7 +1038,7 @@
                 if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
                 if (originMarker) { scene.remove(originMarker); originMarker = null; }
                 heightGrid = null;
-                targetWorld = null;
+                clearTargets();
                 gunOffset.x = 0;
                 gunOffset.z = 0;
                 setCoordinateGrid(null);
@@ -776,6 +1065,7 @@
                     console.log('OBJ: loaded');
                     if (terrainMesh) { scene.remove(terrainMesh); }
                     if (originMarker) { scene.remove(originMarker); originMarker = null; }
+                    clearTargets();
                     terrainMesh = object;
                     const mat = new THREE.MeshStandardMaterial({
                         color: 0x888888,
@@ -877,7 +1167,7 @@
                 if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
                 document.getElementById('fileName').textContent = '—';
                 heightGrid = null;
-                targetWorld = null;
+                clearTargets();
                 setCoordinateGrid(null);
                 trajectoryHistory.forEach(function(l) { scene.remove(l); });
                 trajectoryHistory = [];
@@ -1174,6 +1464,7 @@
             });
 
             // ── Target library ─────────────────────────────────────────────
+            drawThumbnail('thumbBall', '#f25f5c', 'ball');
             drawThumbnail('thumbFactory', '#8899aa', 'factory');
             drawThumbnail('thumbVehicle', '#7a8a6a', 'vehicle');
             function drawThumbnail(canvasId, color, type) {
@@ -1181,7 +1472,11 @@
                 var ctx = c.getContext('2d');
                 ctx.fillStyle = '#1a1d22'; ctx.fillRect(0,0,80,60);
                 ctx.fillStyle = color;
-                if (type === 'factory') {
+                if (type === 'ball') {
+                    ctx.beginPath(); ctx.arc(40,30,14,0,Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#f25f5c'; ctx.fillRect(38,12,4,36);
+                    ctx.strokeStyle = '#f25f5c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(40,44,24,6,0,0,Math.PI*2); ctx.stroke();
+                } else if (type === 'factory') {
                     ctx.fillRect(15,20,50,25);
                     ctx.beginPath(); ctx.moveTo(10,20); ctx.lineTo(40,5); ctx.lineTo(70,20); ctx.fill();
                     ctx.fillStyle = '#665544'; ctx.fillRect(35,5,8,15);
@@ -1192,6 +1487,15 @@
                     ctx.beginPath(); ctx.arc(60,42,6,0,Math.PI*2); ctx.fill();
                     ctx.fillStyle = '#aa8'; ctx.fillRect(28,22,10,8);
                 }
+            }
+            function createBallTargetModel() {
+                var g = new THREE.Group();
+                var ball = new THREE.Mesh(
+                    new THREE.SphereGeometry(45, 32, 20),
+                    new THREE.MeshStandardMaterial({color:0xf25f5c,roughness:0.42,metalness:0.08})
+                );
+                g.add(ball);
+                return g;
             }
             function createFactoryModel() {
                 var g = new THREE.Group();
@@ -1220,16 +1524,40 @@
                     selectedTarget = card.dataset.target;
                 });
             });
-            document.querySelector('.target-card[data-target="factory"]').style.borderColor = '#f0b24f';
-            selectedTarget = 'factory';
+            document.querySelector('.target-card[data-target="ball"]').style.borderColor = '#f0b24f';
+            selectedTarget = 'ball';
+
+            function disposeObject3D(root) {
+                root.traverse(function(obj) {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) obj.material.forEach(function(m) { m.dispose(); });
+                        else obj.material.dispose();
+                    }
+                });
+            }
+
+            function clearTargetModels() {
+                targetModels.forEach(function(model) {
+                    scene.remove(model);
+                    disposeObject3D(model);
+                });
+                targetModels = [];
+            }
 
             function placeTargetModel(wx, wz) {
                 if (!selectedTarget) return;
+                const placementToken = ++targetPlacementToken;
+                clearTargetModels();
                 var target = setTargetWorld(wx, wz);
                 var h = target.y;
                 if (selectedTarget === 'msta') {
                     var loader = new OBJLoader();
                     loader.load('Models/MSTA-S/2S19 MSTA.obj', function(obj) {
+                        if (placementToken !== targetPlacementToken) {
+                            disposeObject3D(obj);
+                            return;
+                        }
                         obj.position.set(wx, h, wz);
                         obj.traverse(function(c) { if (c.isMesh) { c.material = new THREE.MeshStandardMaterial({color:c.material.color||0x5a6a4a,roughness:0.6,metalness:0.3}); c.receiveShadow = true; } });
                         scene.add(obj);
@@ -1239,7 +1567,7 @@
                     });
                     return;
                 }
-                var model = selectedTarget === 'factory' ? createFactoryModel() : createVehicleModel();
+                var model = selectedTarget === 'factory' ? createFactoryModel() : (selectedTarget === 'vehicle' ? createVehicleModel() : createBallTargetModel());
                 model.position.set(wx, h, wz);
                 addTargetRing(model, wx, h, wz);
                 scene.add(model);
@@ -1247,16 +1575,33 @@
                 updateTargetRange(wx, wz);
             }
             function addTargetRing(model, wx, h, wz) {
-                var ring = new THREE.Mesh(new THREE.TorusGeometry(100, 2, 8, 48), new THREE.MeshBasicMaterial({color:0xf25f5c}));
+                var ring = new THREE.Mesh(new THREE.TorusGeometry(100, 4, 8, 48), new THREE.MeshBasicMaterial({color:0xf25f5c}));
                 ring.rotation.x = Math.PI/2;
                 ring.position.set(0, 0.5, 0);
-                model.add(ring);
+                var post = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 90, 12), new THREE.MeshBasicMaterial({color:0xf25f5c}));
+                post.position.set(0, 45, 0);
+                model.add(ring, post);
             }
-            function updateTargetRange(wx, wz) {
+            function updateTargetRange(wx, wz, autoSolve = true) {
                 if (!targetWorld || targetWorld.x !== wx || targetWorld.z !== wz) setTargetWorld(wx, wz);
                 var dx = wx - gunOffset.x, dz = wz - gunOffset.z;
-                document.getElementById('targetRange').value = Math.round(Math.hypot(dx, dz));
-                findAngleForTarget();
+                var range = Math.round(Math.hypot(dx, dz));
+                var rangeInput = document.getElementById('targetRange');
+                rangeInput.value = range;
+                rangeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                rangeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                simStatus.textContent = 'Цель: ' + range + ' м';
+                rebuildPreview();
+                const solveId = ++pendingTargetSolve;
+                if (!autoSolve) return;
+                requestAnimationFrame(function() {
+                    setTimeout(function() {
+                        if (solveId === pendingTargetSolve) {
+                            simStatus.textContent = 'Расчет угла...';
+                            findAngleForTarget(solveId);
+                        }
+                    }, TARGET_SOLVE_DELAY_MS);
+                });
             }
 
             // ── Simulation training block ────────────────────────────────────
@@ -1389,7 +1734,7 @@
                     gunOffset.x = point.x;
                     gunOffset.z = point.z;
                     syncGunToTerrain();
-                    if (targetWorld) updateTargetRange(targetWorld.x, targetWorld.z);
+                    if (targetWorld) updateTargetRange(targetWorld.x, targetWorld.z, false);
                     else rebuildPreview();
                 }
             }
@@ -1399,14 +1744,12 @@
                 if (point) placeTargetModel(point.x, point.z);
             }
 
-            // Clear targets on terrain reset
-            var origResetFn = resetShot;
-            resetShot = function() {
-                targetModels.forEach(function(m) { scene.remove(m); });
-                targetModels = [];
+            function clearTargets() {
+                targetPlacementToken++;
+                clearTargetModels();
                 targetWorld = null;
-                origResetFn();
-            };
+                if (targetMarker) targetMarker.visible = false;
+            }
 
             // ── 3D Axis indicator ────────────────────────────────────────
             var axisScene = new THREE.Scene();

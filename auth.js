@@ -117,7 +117,7 @@
 
     async function sha256(value) {
         if (!window.crypto || !window.crypto.subtle) {
-            throw new Error('WebCrypto is unavailable. Serve the page over HTTPS.');
+            throw new Error('WebCrypto недоступен. Откройте страницу по HTTPS.');
         }
 
         const buffer = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -137,10 +137,10 @@
             <form autocomplete="off">
                 <h1>Ballistica</h1>
                 <label>
-                    Production password
+                    Пароль
                     <input name="password" type="password" autofocus>
                 </label>
-                <button type="submit">Unlock</button>
+                <button type="submit">Войти</button>
                 <div class="auth-error" role="alert"></div>
             </form>
         `;
@@ -159,7 +159,7 @@
                     return;
                 }
 
-                error.textContent = 'Wrong password';
+                error.textContent = 'Неверный пароль';
             } catch (authError) {
                 error.textContent = authError.message;
             } finally {

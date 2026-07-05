@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ballistica / Нейросеть — Обучение</title>
     <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
+    <script src="auth.js?v=20260705-https"></script>
     <style>
         body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
         .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: rgba(11,14,16,0.95); border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -36,8 +36,8 @@
 <div class="topbar">
     <h1>Ballistica / Нейросеть — Обучение</h1>
     <div class="top-actions">
-        <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
-        <a class="top-link" href="tactica.html">Tactica</a>
+        <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Материалы</a>
+        <a class="top-link" href="tactica.html">Тактика</a>
         <a class="top-link" href="network.html">Сеть</a>
         <a class="top-link" href="training.html">Обучение</a>
     </div>
@@ -47,22 +47,41 @@
     <div class="panel">
         <h2>1. Генерация обучающих данных</h2>
         <div class="row">
-            <label>Сэмплов: <input id="genSamples" type="number" value="5000" min="100" max="50000" step="100"></label>
+            <label>Режим: <select id="genMode" style="width:110px"><option value="random">случайный</option><option value="curriculum" selected>учебный</option></select></label>
+            <label>Класс: <select id="genClass" style="width:150px"><option value="all">все</option></select></label>
+            <label>Зерно: <input id="genSeed" type="number" value="152" style="width:65px"></label>
+            <label>Образцов: <input id="genSamples" type="number" value="5000" min="100" max="200000" step="100"></label>
+            <button class="sample-preset" data-samples="5000">5 тыс.</button>
+            <button class="sample-preset" data-samples="50000">50 тыс.</button>
+            <button class="sample-preset" data-samples="100000">100 тыс.</button>
+            <span id="samplePlan" style="font-size:11px;color:#889"></span>
             <label>V₀ (м/с): <input id="genV0min" type="number" value="200" style="width:55px">–<input id="genV0max" type="number" value="800" style="width:55px"></label>
             <label>Угол: <input id="genAngleMin" type="number" value="5" style="width:45px">–<input id="genAngleMax" type="number" value="85" style="width:45px"></label>
             <button id="btnGenerate" class="primary">Сгенерировать</button>
             <span id="genTimer" style="font-size:11px;color:#7fcca0;margin-left:150px"></span>
         </div>
-        <div class="stat">Сгенерировано: <b id="statSamples">0</b> сэмплов</div>
+        <div class="stat">Сгенерировано: <b id="statSamples">0</b> образцов</div>
         <div class="log" id="genLog">Готов к генерации...</div>
     </div>
 
+    <div class="panel" id="datasetPanel">
+        <h2>2. Хранилище данных</h2>
+        <div class="row">
+            <button id="btnAppendDataset">Добавить генерацию</button>
+            <button id="btnReplaceDataset">Заменить сохраненное</button>
+            <button id="btnLoadDataset" class="primary">Загрузить сохраненное</button>
+            <button id="btnExportDataset">Экспорт в файл</button>
+            <button id="btnClearDataset">Очистить сохраненное</button>
+        </div>
+        <div class="stat" id="datasetStat">Хранилище: проверка...</div>
+    </div>
+
     <div class="panel" id="trainPanel" style="display:none">
-        <h2>2. Обучение сети (прямая задача)</h2>
+        <h2>3. Обучение сети (прямая задача)</h2>
         <div class="row">
             <label>Эпох: <input id="trainEpochs" type="number" value="50" min="10" max="500" step="10"></label>
-            <label>LR: <input id="trainLR" type="number" value="0.005" min="0.0001" max="0.1" step="0.001" style="width:65px"></label>
-            <label>Batch: <input id="trainBatch" type="number" value="64" min="8" max="512" step="8"></label>
+            <label>Скор. обучения: <input id="trainLR" type="number" value="0.005" min="0.0001" max="0.1" step="0.001" style="width:65px"></label>
+            <label>Пакет: <input id="trainBatch" type="number" value="64" min="8" max="512" step="8"></label>
             <button id="btnTrain" class="primary">Обучить</button>
             <span id="trainTimer" style="font-size:11px;color:#7fcca0;margin-left:150px"></span>
         </div>
@@ -71,7 +90,7 @@
     </div>
 
     <div class="panel" id="testPanel" style="display:none">
-        <h2>3. Тестирование — прогноз vs симулятор</h2>
+        <h2>4. Тестирование — прогноз и симулятор</h2>
         <div class="row">
             <button id="btnTest" class="primary">Тест на 100 случайных</button>
             <button id="btnTop5" class="primary" style="background:rgba(78,203,113,0.2);border-color:#4ecb71;color:#4ecb71">Топ-5 совпадений</button>
@@ -85,6 +104,8 @@
 
 <footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer>
 
+<script src="training-curriculum.js"></script>
+<script src="terrain-sampler.js"></script>
 <script src="physics.js"></script>
 <script src="nn.js"></script>
 
@@ -96,15 +117,515 @@
     var nn = null;           // trained network
     var lossHistory = [];
     var savedTop5 = [];
+    var activeTerrainGrid = null;
+    var terrainGridPromise = null;
+    var dbPromise = null;
+    var dbReady = false;
+    var DB_NAME = 'BallisticaTrainingDB';
+    var DB_VERSION = 1;
+    var SAMPLE_STORE = 'samples';
+    var META_STORE = 'meta';
+
+    function seededRandom(seed) {
+        var state = (Number(seed) || 1) >>> 0;
+        return function() {
+            state = (state * 1664525 + 1013904223) >>> 0;
+            return state / 4294967296;
+        };
+    }
+
+    function randRange(rng, min, max) {
+        return min + rng() * (max - min);
+    }
+
+    function randRound(rng, min, max, decimals) {
+        var p = Math.pow(10, decimals || 0);
+        return Math.round(randRange(rng, min, max) * p) / p;
+    }
+
+    function openDatasetDb() {
+        if (dbPromise) return dbPromise;
+        if (!window.indexedDB) {
+            dbPromise = Promise.reject(new Error('браузерное хранилище недоступно'));
+            return dbPromise;
+        }
+        dbPromise = new Promise(function(resolve, reject) {
+            var req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function() {
+                var db = req.result;
+                if (!db.objectStoreNames.contains(SAMPLE_STORE)) {
+                    var store = db.createObjectStore(SAMPLE_STORE, { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('classId', 'classId', { unique: false });
+                    store.createIndex('terrain', 'terrain', { unique: false });
+                }
+                if (!db.objectStoreNames.contains(META_STORE)) {
+                    db.createObjectStore(META_STORE, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = function() {
+                dbReady = true;
+                resolve(req.result);
+            };
+            req.onerror = function() { reject(req.error); };
+        });
+        return dbPromise;
+    }
+
+    function txDone(tx) {
+        return new Promise(function(resolve, reject) {
+            tx.oncomplete = resolve;
+            tx.onerror = function() { reject(tx.error); };
+            tx.onabort = function() { reject(tx.error || new Error('транзакция прервана')); };
+        });
+    }
+
+    async function clearStoredDataset() {
+        var db = await openDatasetDb();
+        var tx = db.transaction([SAMPLE_STORE, META_STORE], 'readwrite');
+        tx.objectStore(SAMPLE_STORE).clear();
+        tx.objectStore(META_STORE).put({ key: 'updatedAt', value: new Date().toISOString() });
+        await txDone(tx);
+    }
+
+    async function appendStoredSamples(samples) {
+        if (!samples || !samples.length) return 0;
+        var db = await openDatasetDb();
+        var total = 0;
+        for (var start = 0; start < samples.length; start += 1000) {
+            var chunk = samples.slice(start, start + 1000);
+            var tx = db.transaction([SAMPLE_STORE, META_STORE], 'readwrite');
+            var store = tx.objectStore(SAMPLE_STORE);
+            chunk.forEach(function(sample) {
+                var clean = Object.assign({}, sample);
+                delete clean.id;
+                store.add(clean);
+            });
+            tx.objectStore(META_STORE).put({ key: 'updatedAt', value: new Date().toISOString() });
+            await txDone(tx);
+            total += chunk.length;
+        }
+        return total;
+    }
+
+    async function getStoredSamples() {
+        var db = await openDatasetDb();
+        return new Promise(function(resolve, reject) {
+            var req = db.transaction(SAMPLE_STORE, 'readonly').objectStore(SAMPLE_STORE).getAll();
+            req.onsuccess = function() { resolve(req.result || []); };
+            req.onerror = function() { reject(req.error); };
+        });
+    }
+
+    async function summarizeStoredDataset() {
+        var db = await openDatasetDb();
+        return new Promise(function(resolve, reject) {
+            var stat = { total: 0, terrain: 0, classes: {} };
+            var req = db.transaction(SAMPLE_STORE, 'readonly').objectStore(SAMPLE_STORE).openCursor();
+            req.onsuccess = function() {
+                var cursor = req.result;
+                if (!cursor) {
+                    resolve(stat);
+                    return;
+                }
+                var s = cursor.value;
+                stat.total++;
+                if (s.terrain) stat.terrain++;
+                var cls = s.classId == null ? 'случайные' : String(s.classId);
+                stat.classes[cls] = (stat.classes[cls] || 0) + 1;
+                cursor.continue();
+            };
+            req.onerror = function() { reject(req.error); };
+        });
+    }
+
+    function summarizeSamples(samples) {
+        var stat = { total: samples ? samples.length : 0, terrain: 0, classes: {} };
+        (samples || []).forEach(function(s) {
+            if (s.terrain) stat.terrain++;
+            var cls = s.classId == null ? 'случайные' : String(s.classId);
+            stat.classes[cls] = (stat.classes[cls] || 0) + 1;
+        });
+        return stat;
+    }
+
+    function formatClassCounts(classes) {
+        var keys = Object.keys(classes || {}).sort(function(a, b) { return Number(a) - Number(b); });
+        if (!keys.length) return 'классы: нет';
+        return 'классы: ' + keys.map(function(k) { return k + '=' + classes[k]; }).join(', ');
+    }
+
+    function formatDatasetStat(prefix, stat) {
+        return prefix + ': ' + stat.total + ' образцов, рельеф ' + stat.terrain + ', ' + formatClassCounts(stat.classes);
+    }
+
+    async function refreshStoredDatasetStat(extra) {
+        var el = document.getElementById('datasetStat');
+        if (!el) return;
+        try {
+            var stored = await summarizeStoredDataset();
+            var current = summarizeSamples(dataset || []);
+            el.textContent = (extra ? extra + ' | ' : '') +
+                formatDatasetStat('загружено', current) + ' | ' +
+                formatDatasetStat('сохранено', stored);
+            updateDatasetButtons();
+        } catch (err) {
+            el.textContent = 'Ошибка хранилища: ' + err.message;
+        }
+    }
+
+    function updateDatasetButtons() {
+        var hasLoaded = dataset && dataset.length > 0;
+        var ids = ['btnAppendDataset', 'btnReplaceDataset'];
+        ids.forEach(function(id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.disabled = !hasLoaded;
+        });
+    }
+
+    function setDataset(samples, sourceLabel) {
+        dataset = samples || [];
+        splitData = null;
+        normData = null;
+        savedTop5 = [];
+        document.getElementById('statSamples').textContent = dataset.length;
+        document.getElementById('trainPanel').style.display = dataset.length ? '' : 'none';
+        document.getElementById('btnTrain').disabled = !dataset.length;
+        refreshStoredDatasetStat(sourceLabel || 'набор данных загружен');
+    }
+
+    function exportSamples(samples) {
+        if (!samples || !samples.length) return;
+        var lines = samples.map(function(s) { return JSON.stringify(s); }).join('\n');
+        var blob = new Blob([lines + '\n'], { type: 'application/x-ndjson' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'ballistica-dataset-' + new Date().toISOString().replace(/[:.]/g, '-') + '.jsonl';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    function terrainClassesNeeded(mode, classIds) {
+        return mode === 'curriculum' && classIds.some(function(id) { return id >= 4; });
+    }
+
+    function loadTrainingTerrain(log) {
+        if (activeTerrainGrid) return Promise.resolve(activeTerrainGrid);
+        if (!window.BallisticaTerrain) return Promise.resolve(null);
+        if (!terrainGridPromise) {
+            if (log) log.textContent = 'Загрузка Terrain_2.obj для учебного режима...';
+            terrainGridPromise = window.BallisticaTerrain.loadObjHeightGrid('Terrain_2.obj', {
+                gridSize: 256,
+                worldSize: 35000
+            }).then(function(grid) {
+                activeTerrainGrid = grid;
+                return grid;
+            }).catch(function(err) {
+                console.error(err);
+                terrainGridPromise = null;
+                return null;
+            });
+        }
+        return terrainGridPromise;
+    }
+
+    function pickTerrainShot(grid, rng, minRange, maxRange) {
+        if (!grid) return null;
+        var margin = Math.max(2500, maxRange + 1000);
+        if (margin * 2 > grid.worldSize - 1000) margin = grid.worldSize * 0.25;
+        for (var attempt = 0; attempt < 40; attempt++) {
+            var gun = window.BallisticaTerrain.pickPoint(grid, rng, margin);
+            var range = Math.round(randRange(rng, minRange, maxRange));
+            var bearing = Math.round(randRange(rng, 0, 360));
+            var target = window.BallisticaTerrain.pointAtBearing(grid, gun, range, bearing);
+            if (!window.BallisticaTerrain.contains(grid, target.x, target.z, 500)) continue;
+            return { gun: gun, target: target, range: range, bearing: bearing };
+        }
+        return null;
+    }
+
+    function simulateSample(sample, terrainGrid) {
+        var p = {
+            v0: sample.v0,
+            angle: sample.angle,
+            azimuth: sample.azimuth,
+            h0: sample.h0,
+            windX: sample.windX,
+            windY: sample.windY,
+            windZ: sample.windZ,
+            turbulence: sample.turbulence || 0,
+            mass: sample.mass,
+            formFactor: sample.formFactor || 0.92,
+            cdConst: sample.cdConst || 0.25,
+            cdModel: sample.cdModel || 'machTable',
+            maxTime: 300,
+            dt: 0.02,
+            densityScale: 1,
+            turbulenceScale: 500
+        };
+        var oldTerrainFn = window._terrainHeightFn;
+        if (sample.terrain && terrainGrid && window.BallisticaTerrain) {
+            window._terrainHeightFn = function(localX, localZ) {
+                return window.BallisticaTerrain.sampleHeight(
+                    terrainGrid,
+                    (sample.gunX || 0) + localX,
+                    (sample.gunZ || 0) + localZ
+                );
+            };
+        } else {
+            window._terrainHeightFn = null;
+        }
+        var shot = new Projectile(p.v0, p.angle, p.h0, p.azimuth, p);
+        try {
+            shot.run(p.maxTime, p.dt);
+        } finally {
+            window._terrainHeightFn = oldTerrainFn || null;
+        }
+        return Object.assign({}, sample, {
+            range: Math.round(shot.getHorizontalRange()),
+            impactX: Math.round(shot.x),
+            impactY: Math.round(shot.y),
+            impactZ: Math.round(shot.z),
+            time: Math.round(shot.t * 10) / 10,
+            impactAngle: Math.round(shot.impactAngle * 180 / Math.PI * 10) / 10,
+            energy: Math.round(shot.getKineticEnergy() / 1000) / 1000
+        });
+    }
+
+    function makeCurriculumSample(classId, rng, opts) {
+        var sample = {
+            classId: classId,
+            lessonId: 0,
+            v0: Math.round(randRange(rng, opts.v0Min, opts.v0Max)),
+            angle: randRound(rng, opts.angMin, opts.angMax, 1),
+            azimuth: Math.round(randRange(rng, 0, 360)),
+            h0: 0,
+            windX: 0,
+            windY: 0,
+            windZ: 0,
+            turbulence: 0,
+            mass: 43.5,
+            formFactor: 0.92,
+            cdConst: 0.25,
+            cdModel: 'machTable',
+            terrain: 0,
+            gunX: 0,
+            gunZ: 0,
+            targetX: 0,
+            targetY: 0,
+            targetZ: 0,
+            targetRange: 0,
+            targetBearing: 0,
+            targetHeightDelta: 0
+        };
+
+        if (classId === 1) {
+            sample.v0 = randRound(rng, 600, Math.max(610, opts.v0Max), 0);
+            sample.angle = randRound(rng, Math.max(5, opts.angMin), Math.min(75, opts.angMax), 1);
+            sample.azimuth = 0;
+        } else if (classId === 2) {
+            sample.mass = rng() < 0.55 ? 43.5 : 16;
+            sample.formFactor = sample.mass > 20 ? 0.92 : 1.15;
+        } else if (classId === 3) {
+            sample.windX = Math.round(randRange(rng, -25, 25));
+            sample.windZ = Math.round(randRange(rng, -25, 25));
+            sample.windY = Math.round(randRange(rng, -4, 4));
+            sample.turbulence = randRound(rng, 0, 5, 1);
+        } else if (classId === 4) {
+            var plainsShot = pickTerrainShot(opts.terrainGrid, rng, 4000, 16000);
+            if (plainsShot) {
+                sample.terrain = 1;
+                sample.gunX = Math.round(plainsShot.gun.x);
+                sample.gunZ = Math.round(plainsShot.gun.z);
+                sample.h0 = Math.round(plainsShot.gun.y);
+                sample.azimuth = plainsShot.bearing;
+                sample.targetX = Math.round(plainsShot.target.x);
+                sample.targetY = Math.round(plainsShot.target.y);
+                sample.targetZ = Math.round(plainsShot.target.z);
+                sample.targetRange = plainsShot.range;
+                sample.targetBearing = plainsShot.bearing;
+                sample.targetHeightDelta = Math.round(plainsShot.target.y - plainsShot.gun.y);
+            } else {
+                sample.h0 = Math.round(randRange(rng, 0, 600));
+            }
+        } else if (classId === 5) {
+            var mountainShot = pickTerrainShot(opts.terrainGrid, rng, 6000, 22000);
+            if (mountainShot) {
+                sample.terrain = 1;
+                sample.gunX = Math.round(mountainShot.gun.x);
+                sample.gunZ = Math.round(mountainShot.gun.z);
+                sample.h0 = Math.round(mountainShot.gun.y);
+                sample.azimuth = mountainShot.bearing;
+                sample.targetX = Math.round(mountainShot.target.x);
+                sample.targetY = Math.round(mountainShot.target.y);
+                sample.targetZ = Math.round(mountainShot.target.z);
+                sample.targetRange = mountainShot.range;
+                sample.targetBearing = mountainShot.bearing;
+                sample.targetHeightDelta = Math.round(mountainShot.target.y - mountainShot.gun.y);
+            } else {
+                sample.h0 = Math.round(randRange(rng, 100, 900));
+            }
+            sample.angle = randRound(rng, Math.max(35, opts.angMin), Math.min(85, opts.angMax), 1);
+            sample.windX = Math.round(randRange(rng, -12, 12));
+            sample.windZ = Math.round(randRange(rng, -12, 12));
+        } else {
+            var mixedShot = pickTerrainShot(opts.terrainGrid, rng, 3000, 24000);
+            if (mixedShot) {
+                sample.terrain = 1;
+                sample.gunX = Math.round(mixedShot.gun.x);
+                sample.gunZ = Math.round(mixedShot.gun.z);
+                sample.h0 = Math.round(mixedShot.gun.y);
+                sample.azimuth = mixedShot.bearing;
+                sample.targetX = Math.round(mixedShot.target.x);
+                sample.targetY = Math.round(mixedShot.target.y);
+                sample.targetZ = Math.round(mixedShot.target.z);
+                sample.targetRange = mixedShot.range;
+                sample.targetBearing = mixedShot.bearing;
+                sample.targetHeightDelta = Math.round(mixedShot.target.y - mixedShot.gun.y);
+            } else {
+                sample.h0 = Math.round(randRange(rng, 0, 700));
+            }
+            sample.windX = Math.round(randRange(rng, -30, 30));
+            sample.windY = Math.round(randRange(rng, -8, 8));
+            sample.windZ = Math.round(randRange(rng, -30, 30));
+            sample.turbulence = randRound(rng, 0, 8, 1);
+            sample.mass = rng() < 0.5 ? 43.5 : 16;
+            sample.formFactor = sample.mass > 20 ? 0.92 : 1.15;
+        }
+
+        return sample;
+    }
+
+    function populateCurriculumControls() {
+        var select = document.getElementById('genClass');
+        var curriculum = window.TrainingCurriculum;
+        if (!select || !curriculum || !curriculum.classes) return;
+        curriculum.classes.forEach(function(cls) {
+            var opt = document.createElement('option');
+            opt.value = String(cls.id);
+            opt.textContent = cls.id + '. ' + cls.label;
+            select.appendChild(opt);
+        });
+    }
+
+    function selectedClassIds() {
+        var mode = document.getElementById('genMode').value;
+        var classSelect = document.getElementById('genClass').value;
+        if (mode !== 'curriculum') return [];
+        if (classSelect === 'all') {
+            return (window.TrainingCurriculum && window.TrainingCurriculum.classes || []).map(function(cls) {
+                return cls.id;
+            });
+        }
+        return [Number(classSelect) || 1];
+    }
+
+    function modeLabel(mode) {
+        return mode === 'curriculum' ? 'учебный' : 'случайный';
+    }
+
+    function updateSamplePlan() {
+        var n = Number(document.getElementById('genSamples').value) || 0;
+        var classIds = selectedClassIds();
+        var plan = document.getElementById('samplePlan');
+        if (!plan) return;
+        if (!classIds.length) {
+            plan.textContent = 'случайный набор: всего ' + n;
+        } else if (classIds.length === 1) {
+            plan.textContent = 'класс ' + classIds[0] + ': ' + n;
+        } else {
+            plan.textContent = 'все: ~' + Math.floor(n / classIds.length) + ' на класс';
+        }
+    }
+
+    document.querySelectorAll('.sample-preset').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('genSamples').value = btn.dataset.samples;
+            updateSamplePlan();
+        });
+    });
+    document.getElementById('genMode').addEventListener('change', updateSamplePlan);
+    document.getElementById('genClass').addEventListener('change', updateSamplePlan);
+    document.getElementById('genSamples').addEventListener('input', updateSamplePlan);
+
+    document.getElementById('btnAppendDataset').addEventListener('click', async function() {
+        if (!dataset || !dataset.length) return;
+        var btn = this;
+        btn.disabled = true;
+        document.getElementById('datasetStat').textContent = 'Добавление ' + dataset.length + ' образцов...';
+        try {
+            var added = await appendStoredSamples(dataset);
+            await refreshStoredDatasetStat('добавлено ' + added);
+        } finally {
+            updateDatasetButtons();
+        }
+    });
+
+    document.getElementById('btnReplaceDataset').addEventListener('click', async function() {
+        if (!dataset || !dataset.length) return;
+        var btn = this;
+        btn.disabled = true;
+        document.getElementById('datasetStat').textContent = 'Замена сохраненного набора данных...';
+        try {
+            await clearStoredDataset();
+            var added = await appendStoredSamples(dataset);
+            await refreshStoredDatasetStat('сохраненное заменено: ' + added);
+        } finally {
+            updateDatasetButtons();
+        }
+    });
+
+    document.getElementById('btnLoadDataset').addEventListener('click', async function() {
+        var btn = this;
+        btn.disabled = true;
+        document.getElementById('datasetStat').textContent = 'Загрузка сохраненного набора данных...';
+        try {
+            var samples = await getStoredSamples();
+            setDataset(samples, 'загружено сохраненное');
+            document.getElementById('genLog').textContent = 'Загружен сохраненный набор данных: ' + samples.length + ' образцов';
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    document.getElementById('btnExportDataset').addEventListener('click', async function() {
+        if (dataset && dataset.length) {
+            exportSamples(dataset);
+            return;
+        }
+        var samples = await getStoredSamples();
+        exportSamples(samples);
+    });
+
+    document.getElementById('btnClearDataset').addEventListener('click', async function() {
+        var btn = this;
+        btn.disabled = true;
+        document.getElementById('datasetStat').textContent = 'Очистка сохраненного набора данных...';
+        try {
+            await clearStoredDataset();
+            await refreshStoredDatasetStat('сохраненное очищено');
+        } finally {
+            btn.disabled = false;
+        }
+    });
 
     document.getElementById('btnGenerate').addEventListener('click', startGeneration);
+    populateCurriculumControls();
+    updateSamplePlan();
+    refreshStoredDatasetStat();
 
-    function startGeneration() {
+    async function startGeneration() {
         var n = Number(document.getElementById('genSamples').value) || 5000;
         var v0Min = Number(document.getElementById('genV0min').value) || 200;
         var v0Max = Number(document.getElementById('genV0max').value) || 800;
         var angMin = Number(document.getElementById('genAngleMin').value) || 5;
         var angMax = Number(document.getElementById('genAngleMax').value) || 85;
+        var mode = document.getElementById('genMode').value;
+        var classSelect = document.getElementById('genClass').value;
+        var seed = Number(document.getElementById('genSeed').value) || 152;
+        var rng = mode === 'curriculum' ? seededRandom(seed) : Math.random;
         var log = document.getElementById('genLog');
         var btn = document.getElementById('btnGenerate');
 
@@ -116,31 +637,52 @@
         var genStart = Date.now();
         var genIndex = 0;
         var chunkSize = 200;
+        var classIds = [];
+        if (mode === 'curriculum') {
+            if (classSelect === 'all') {
+                classIds = (window.TrainingCurriculum && window.TrainingCurriculum.classes || []).map(function(cls) {
+                    return cls.id;
+                });
+            } else {
+                classIds = [Number(classSelect) || 1];
+            }
+            if (!classIds.length) classIds = [1];
+        }
+        var terrainGrid = null;
+        if (terrainClassesNeeded(mode, classIds)) {
+            terrainGrid = await loadTrainingTerrain(log);
+            if (!terrainGrid) log.textContent = 'Terrain_2.obj не загружен, классы рельефа идут по запасному h₀.';
+        }
+        var genOpts = { v0Min: v0Min, v0Max: v0Max, angMin: angMin, angMax: angMax, terrainGrid: terrainGrid };
 
         function genChunk() {
             var end = Math.min(genIndex + chunkSize, n);
             for (var i = genIndex; i < end; i++) {
-                var v0 = Math.round(v0Min + Math.random() * (v0Max - v0Min));
-                var angle = Math.round((angMin + Math.random() * (angMax - angMin)) * 10) / 10;
-                var azimuth = Math.round(Math.random() * 360);
-                var h0 = Math.round(Math.random() * 500);
-                var windX = Math.round((Math.random() - 0.5) * 40);
-                var windY = Math.round((Math.random() - 0.5) * 20);
-                var windZ = Math.round((Math.random() - 0.5) * 40);
-                var mass = (Math.random() < 0.5) ? 43.5 : 16;
-                params.v0 = v0; params.angle = angle; params.azimuth = azimuth;
-                params.h0 = h0; params.windX = windX; params.windY = windY; params.windZ = windZ;
-                params.mass = mass; params.formFactor = 0.92; params.cdModel = 'machTable';
-                params.maxTime = 300; params.dt = 0.02;
-                var shot = new Projectile(v0, angle, h0, azimuth, params);
-                shot.run(300, 0.02);
-                dataset.push({
-                    v0, angle, azimuth, h0, windX, windY, windZ, mass,
-                    range: Math.round(shot.getHorizontalRange()),
-                    time: Math.round(shot.t * 10) / 10,
-                    impactAngle: Math.round(shot.impactAngle * 180 / Math.PI * 10) / 10,
-                    energy: Math.round(shot.getKineticEnergy() / 1000) / 1000,
-                });
+                var sample;
+                if (mode === 'curriculum') {
+                    sample = makeCurriculumSample(classIds[i % classIds.length], rng, genOpts);
+                } else {
+                    sample = {
+                        classId: 0,
+                        lessonId: 0,
+                        v0: Math.round(v0Min + rng() * (v0Max - v0Min)),
+                        angle: Math.round((angMin + rng() * (angMax - angMin)) * 10) / 10,
+                        azimuth: Math.round(rng() * 360),
+                        h0: Math.round(rng() * 500),
+                        windX: Math.round((rng() - 0.5) * 40),
+                        windY: Math.round((rng() - 0.5) * 20),
+                        windZ: Math.round((rng() - 0.5) * 40),
+                        turbulence: 0,
+                        mass: rng() < 0.5 ? 43.5 : 16,
+                        formFactor: 0.92,
+                        cdConst: 0.25,
+                        cdModel: 'machTable',
+                        terrain: 0,
+                        gunX: 0,
+                        gunZ: 0
+                    };
+                }
+                dataset.push(simulateSample(sample, terrainGrid));
             }
             genIndex = end;
             var elapsed = ((Date.now() - genStart) / 1000);
@@ -154,12 +696,20 @@
                 setTimeout(genChunk, 1);
             } else {
                 var totalTime = ((Date.now() - genStart) / 1000).toFixed(1);
+                var ranges = dataset.map(function(s) { return s.range; });
+                var minRange = Math.min.apply(Math, ranges);
+                var maxRange = Math.max.apply(Math, ranges);
                 document.getElementById('genTimer').textContent = 'готово (' + totalTime + ' с)';
-                log.textContent = 'Сгенерировано ' + n + ' сэмплов за ' + totalTime + ' с\n';
-                log.textContent += 'Дальность: ' + dataset[0].range + '–' + dataset[n-1].range + ' м';
+                log.textContent = 'Сгенерировано ' + n + ' образцов за ' + totalTime + ' с\n';
+                log.textContent += 'Дальность: ' + minRange + '–' + maxRange + ' м';
+                log.textContent += '\nрежим: ' + modeLabel(mode);
+                if (mode === 'curriculum') log.textContent += ', классы: ' + classIds.join(', ') + ', зерно=' + seed;
+                var terrainSamples = dataset.filter(function(s) { return s.terrain; }).length;
+                if (terrainSamples) log.textContent += '\nрельефных образцов: ' + terrainSamples + ', источник: Terrain_2.obj';
                 btn.disabled = false;
                 document.getElementById('trainPanel').style.display = '';
                 document.getElementById('btnTrain').disabled = false;
+                refreshStoredDatasetStat('сгенерировано ' + dataset.length);
             }
         }
 
@@ -255,9 +805,9 @@
 
     function metricsText(metrics) {
         if (!metrics) return '';
-        return 'MAE ' + Math.round(metrics.mae) + ' m, RMSE ' + Math.round(metrics.rmse) +
-            ' m, P90 ' + Math.round(metrics.p90) + ' m, P99 ' + Math.round(metrics.p99) +
-            ' m, средн. ' + metrics.avgPct.toFixed(1) + '%';
+        return 'средняя абс. ' + Math.round(metrics.mae) + ' м, среднеквадр. ' + Math.round(metrics.rmse) +
+            ' м, 90% ' + Math.round(metrics.p90) + ' м, 99% ' + Math.round(metrics.p99) +
+            ' м, средн. ' + metrics.avgPct.toFixed(1) + '%';
     }
 
     function trainNetwork() {
@@ -273,7 +823,7 @@
         lossHistory = [];
         var trainStart = Date.now();
         document.getElementById('trainStat').textContent =
-            'Разбиение: train ' + splitData.train.length + ', val ' + splitData.val.length + ', test ' + splitData.test.length;
+            'Разбиение: обучение ' + splitData.train.length + ', проверка ' + splitData.val.length + ', тест ' + splitData.test.length;
 
         var currentEpoch = 0;
         function trainChunk() {
@@ -296,11 +846,11 @@
             var lastLoss = lossHistory[lossHistory.length - 1] || { loss: 0, valLoss: 0 };
             document.getElementById('trainTimer').textContent = 'осталось ~' + remaining + ' с';
             document.getElementById('trainStat').textContent =
-                'Эпоха ' + currentEpoch + '/' + epochs + ' — loss: ' + (lossHistory[lossHistory.length - 1]?.loss || 0).toFixed(6);
+                'Эпоха ' + currentEpoch + '/' + epochs + ' — ошибка: ' + (lossHistory[lossHistory.length - 1]?.loss || 0).toFixed(6);
 
             document.getElementById('trainStat').textContent =
-                'Эпоха ' + currentEpoch + '/' + epochs + ' - train: ' + lastLoss.loss.toFixed(6) +
-                ', val: ' + lastLoss.valLoss.toFixed(6);
+                'Эпоха ' + currentEpoch + '/' + epochs + ' - обучение: ' + lastLoss.loss.toFixed(6) +
+                ', проверка: ' + lastLoss.valLoss.toFixed(6);
 
             if (currentEpoch < epochs) {
                 setTimeout(trainChunk, 10);
@@ -310,7 +860,7 @@
                 var metrics = summarizeRows(testRows);
                 document.getElementById('trainTimer').textContent = 'готово (' + totalTime + ' с)';
                 document.getElementById('trainStat').textContent =
-                    'Завершено! Эпох: ' + epochs + ', финальный loss: ' + lossHistory[lossHistory.length - 1].loss.toFixed(6) + ', время: ' + totalTime + ' с';
+                    'Завершено! Эпох: ' + epochs + ', финальная ошибка: ' + lossHistory[lossHistory.length - 1].loss.toFixed(6) + ', время: ' + totalTime + ' с';
                 document.getElementById('testPanel').style.display = '';
                 document.getElementById('btnTrain').disabled = false;
                 document.getElementById('trainStat').textContent =
@@ -354,7 +904,7 @@
         ctx.stroke();
 
         ctx.fillStyle = '#889'; ctx.font = '10px monospace';
-        ctx.fillText('Loss: ' + maxLoss.toFixed(4), 10, 14);
+        ctx.fillText('Ошибка: ' + maxLoss.toFixed(4), 10, 14);
         ctx.fillText(minLoss.toFixed(6), 10, h - 4);
     }
 
@@ -368,18 +918,18 @@
         var metrics = summarizeRows(rowsAll);
         var worst = rowsAll.slice().sort(function(a, b) { return b.err - a.err; }).slice(0, 25);
         var table = document.getElementById('testTable');
-        var html = '<tr><th>#</th><th>V0</th><th>Угол</th><th>Дальность сим</th><th>Дальность NN</th><th>Абс. ошибка</th><th>Ошибка %</th></tr>';
+        var html = '<tr><th>#</th><th>V₀</th><th>Угол</th><th>Дальность сим.</th><th>Дальность сети</th><th>Абс. ошибка</th><th>Ошибка %</th></tr>';
         worst.forEach(function(r, i) {
             html += '<tr><td>'+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td>'+
                 '<td class="val">'+r.s.range+'</td><td class="val">'+r.predRange+'</td>'+
-                '<td class="err">'+Math.round(r.absErr)+' m</td>'+
+                '<td class="err">'+Math.round(r.absErr)+' м</td>'+
                 '<td class="'+(r.err<5?'good':'err')+'">'+r.err.toFixed(1)+'%</td></tr>';
         });
-        html += '<tr><td colspan="3"><b>Отложенный test: '+rowsAll.length+' выстрелов</b></td>'+
+        html += '<tr><td colspan="3"><b>Отложенный тест: '+rowsAll.length+' выстрелов</b></td>'+
             '<td colspan="4" class="'+(metrics.avgPct<5?'good':'err')+'"><b>'+metricsText(metrics)+'</b></td></tr>';
         table.innerHTML = html;
         document.getElementById('top5block').innerHTML =
-            '<div class="stat">Показаны худшие 25 случаев из отложенной test-выборки, не из обучения.</div>';
+            '<div class="stat">Показаны худшие 25 случаев из отложенной тестовой выборки, не из обучения.</div>';
         return;
         var table = document.getElementById('testTable');
         var rows = [];
@@ -416,9 +966,9 @@
         var rowsAll = buildPredictionRows(nn, normData.test, splitData.test);
         rowsAll.sort(function(a,b) { return a.err - b.err; });
         var top5 = rowsAll.slice(0, 5);
-        var html = '<h3 style="color:#4ecb71;margin-top:8px">Топ-5 лучших совпадений holdout</h3>';
-        html += '<div class="stat">Только диагностика: это лучшие случаи на test-данных, не общая оценка качества.</div>';
-        html += '<table class="compare-table"><tr style="background:rgba(78,203,113,0.1)"><th>#</th><th>V0</th><th>Угол</th><th>h0</th><th>Азимут</th><th>Дальность сим</th><th>Дальность NN</th><th>Ошибка</th></tr>';
+        var html = '<h3 style="color:#4ecb71;margin-top:8px">Топ-5 лучших совпадений отложенной выборки</h3>';
+        html += '<div class="stat">Только диагностика: это лучшие случаи на тестовых данных, не общая оценка качества.</div>';
+        html += '<table class="compare-table"><tr style="background:rgba(78,203,113,0.1)"><th>#</th><th>V₀</th><th>Угол</th><th>h₀</th><th>Азимут</th><th>Дальность сим.</th><th>Дальность сети</th><th>Ошибка</th></tr>';
         top5.forEach(function(r, i) {
             html += '<tr style="background:rgba(78,203,113,'+(0.08-i*0.012)+')">'+
                 '<td class="good">#'+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td><td>'+r.s.h0+'</td><td>'+r.s.azimuth+'</td>'+
@@ -469,7 +1019,7 @@
                 rangeSim:r.s.range, rangeNN:r.predRange, err:r.err.toFixed(2)};
         });
         localStorage.setItem('nn_top5_results', JSON.stringify(data));
-        document.getElementById('top5block').innerHTML += '<div style="color:#5bc8f0;font-size:11px;margin-top:4px">✓ Сохранено в localStorage</div>';
+        document.getElementById('top5block').innerHTML += '<div style="color:#5bc8f0;font-size:11px;margin-top:4px">✓ Сохранено в локальном хранилище</div>';
     }
 
     function loadTop5() {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ballistica / Нейросеть</title>
     <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
+    <script src="auth.js?v=20260705-https"></script>
     <style>
         body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
         .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: linear-gradient(180deg,rgba(11,14,16,0.95) 0%,rgba(11,14,16,0.7) 80%,transparent); }
@@ -96,12 +96,13 @@
                 <div class="flow-box in">Азимут<br><small>направление</small></div>
                 <div class="flow-box in">Ветер<br><small>X Y Z</small></div>
                 <div class="flow-box in">Масса<br><small>снаряда</small></div>
+                <div class="flow-box in">Орудие<br><small>gunX, gunZ</small></div>
                 <div class="flow-box in">Цель<br><small>x, z, v</small></div>
                 <div class="flow-box in">Рельеф<br><small>h(x,z)</small></div>
             </div>
             <div style="text-align:center;margin:8px 0"><span class="flow-arrow" style="font-size:22px">↓</span></div>
             <div class="flow-row">
-                <span class="flow-box nn" style="min-width:260px">Нейросеть (MLP / RL-политика)<br><small>8 входов → 128 → 64 → 4 выхода</small></span>
+                <span class="flow-box nn" style="min-width:260px">Нейросеть (MLP / RL-политика)<br><small>10 входов → 128 → 64 → 4 выхода</small></span>
             </div>
             <div style="text-align:center;margin:8px 0"><span class="flow-arrow" style="font-size:22px">↓</span></div>
             <div class="flow-row">
@@ -118,7 +119,7 @@
             <tr><th>Режим</th><th>Описание</th><th>Применение</th></tr>
             <tr>
                 <td><b>Прямая задача</b></td>
-                <td>Дано: V₀, угол, азимут, ветер → сеть предсказывает точку падения</td>
+                <td>Дано: V₀, угол, азимут, ветер, позиция орудия на рельефе → сеть предсказывает точку падения</td>
                 <td><span class="tag g">Огонь по координатам</span></td>
             </tr>
             <tr>
@@ -128,7 +129,7 @@
             </tr>
             <tr>
                 <td><b>Статическая цель</b></td>
-                <td>Цель неподвижна — расчёт по карте высот h(x,z) в точке цели</td>
+                <td>Цель неподвижна — расчёт по карте высот в точке орудия и цели</td>
                 <td><span class="tag g">Укрепления, позиции</span></td>
             </tr>
             <tr>
@@ -148,7 +149,7 @@
         <div class="grid">
             <div class="card blue">
                 <h4>Фаза 1 — Генерация данных</h4>
-                <p>Симулятор прогоняет миллионы выстрелов с разными параметрами на реальном рельефе. Каждый запуск записывается: <b>входные параметры → результат</b>. Это эталонная таблица для обучения.</p>
+                <p>Симулятор прогоняет миллионы выстрелов с разными параметрами на реальном рельефе. Каждый запуск записывает параметры выстрела, gunX/gunZ и результат. Это эталонная таблица для обучения.</p>
             </div>
             <div class="card green">
                 <h4>Фаза 2 — Обучение сети</h4>

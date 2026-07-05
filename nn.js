@@ -191,8 +191,8 @@
 
     window.BallisticsNN = {
         // Direct: (v0, angle, azimuth, h0, windX, windY, windZ, mass) → (range, time, impactAngle, energy)
-        DIRECT_LAYERS: [8, 128, 64, 4],
-        DIRECT_INPUT_KEYS: ['v0', 'angle', 'azimuth', 'h0', 'windX', 'windY', 'windZ', 'mass'],
+        DIRECT_LAYERS: [10, 128, 64, 4],
+        DIRECT_INPUT_KEYS: ['v0', 'angle', 'azimuth', 'h0', 'windX', 'windY', 'windZ', 'mass', 'gunX', 'gunZ'],
         DIRECT_OUTPUT_KEYS: ['range', 'time', 'impactAngle', 'energy'],
 
         // Inverse: (targetRange, targetLateral, windX, windZ, mass) → (angle, azimuth)
