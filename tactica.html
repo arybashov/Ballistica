@@ -610,16 +610,21 @@
                     });
                     scene.add(terrainMesh);
                     document.getElementById('fileName').textContent = path;
-                    // Scale to 5000m, shift corner to origin
+                    // Scale terrain, keep horizontal center at world origin and ground base at Y=0.
                     const rawBox = new THREE.Box3().setFromObject(terrainMesh);
                     const rawSize = Math.max(rawBox.max.x - rawBox.min.x, rawBox.max.z - rawBox.min.z);
                     const s = 35000 / rawSize;
                     terrainMesh.scale.set(s, s, s);
                     terrainMesh.updateMatrixWorld();
                     const box2 = new THREE.Box3().setFromObject(terrainMesh);
-                    terrainMesh.position.set(-box2.min.x, 0, -box2.min.z);
+                    const center2 = box2.getCenter(new THREE.Vector3());
+                    terrainMesh.position.set(
+                        terrainMesh.position.x - center2.x,
+                        terrainMesh.position.y - box2.min.y,
+                        terrainMesh.position.z - center2.z
+                    );
                     terrainMesh.updateMatrixWorld();
-                    console.log('Terrain scaled to 35000m, corner at origin');
+                    console.log('Terrain scaled to 35000m, center at origin');
                     buildHeightGrid(terrainMesh);
                     createTrajectoryLine();
                     const box3 = new THREE.Box3().setFromObject(terrainMesh);
@@ -772,7 +777,12 @@
                 terrainMesh.scale.set(s, s, s);
                 terrainMesh.updateMatrixWorld();
                 const box2 = new THREE.Box3().setFromObject(terrainMesh);
-                terrainMesh.position.set(-box2.min.x, 0, -box2.min.z);
+                const center2 = box2.getCenter(new THREE.Vector3());
+                terrainMesh.position.set(
+                    terrainMesh.position.x - center2.x,
+                    terrainMesh.position.y - box2.min.y,
+                    terrainMesh.position.z - center2.z
+                );
                 terrainMesh.updateMatrixWorld();
                 const box3 = new THREE.Box3().setFromObject(terrainMesh);
                 const worldSize = Math.max(box3.max.x - box3.min.x, box3.max.z - box3.min.z);
@@ -781,8 +791,8 @@
                 document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
                 if (gunMarker) gunMarker.position.set(gunOffset.x, getTerrainH(gunOffset.x, gunOffset.z), gunOffset.z);
                 if (gunRing) gunRing.position.copy(gunMarker.position);
-                const center2 = new THREE.Box3().setFromObject(terrainMesh).getCenter(new THREE.Vector3());
-                orbit.target.copy(center2);
+                const centeredBox = new THREE.Box3().setFromObject(terrainMesh);
+                orbit.target.copy(centeredBox.getCenter(new THREE.Vector3()));
                 orbit.distance = worldSize * 1.5;
                 updateCamera();
             });
