@@ -192,6 +192,8 @@
     window.BallisticsNN = {
         // Direct: (v0, angle, azimuth, h0, windX, windY, windZ, mass) → (range, time, impactAngle, energy)
         DIRECT_LAYERS: [8, 128, 64, 4],
+        DIRECT_INPUT_KEYS: ['v0', 'angle', 'azimuth', 'h0', 'windX', 'windY', 'windZ', 'mass'],
+        DIRECT_OUTPUT_KEYS: ['range', 'time', 'impactAngle', 'energy'],
 
         // Inverse: (targetRange, targetLateral, windX, windZ, mass) → (angle, azimuth)
         INVERSE_LAYERS: [5, 96, 48, 2],
@@ -204,12 +206,17 @@
             return new NeuralNetwork(this.INVERSE_LAYERS);
         },
 
-        normalizeInputs(samples) {
-            // samples: [{v0, angle, azimuth, h0, windX, windY, windZ, mass, range, time, impactAngle, energy}]
-            if (!samples || samples.length === 0) return { inputs: [], targets: [], mins: {}, maxs: {} };
-
-            const keys = ['v0', 'angle', 'azimuth', 'h0', 'windX', 'windY', 'windZ', 'mass'];
-            const outKeys = ['range', 'time', 'impactAngle', 'energy'];
+        fitDirectStats(samples) {
+            if (!samples || samples.length === 0) {
+                return {
+                    mins: {},
+                    maxs: {},
+                    inputKeys: this.DIRECT_INPUT_KEYS.slice(),
+                    outputKeys: this.DIRECT_OUTPUT_KEYS.slice()
+                };
+            }
+            const keys = this.DIRECT_INPUT_KEYS;
+            const outKeys = this.DIRECT_OUTPUT_KEYS;
             const mins = {}, maxs = {};
 
             for (const k of [...keys, ...outKeys]) {
@@ -217,6 +224,30 @@
                 mins[k] = Math.min(...vals);
                 maxs[k] = Math.max(...vals);
             }
+
+            return {
+                mins,
+                maxs,
+                inputKeys: keys.slice(),
+                outputKeys: outKeys.slice()
+            };
+        },
+
+        normalizeDirectWithStats(samples, stats) {
+            if (!samples || samples.length === 0) {
+                return {
+                    inputs: [],
+                    targets: [],
+                    mins: stats ? stats.mins : {},
+                    maxs: stats ? stats.maxs : {},
+                    inputKeys: stats ? stats.inputKeys : this.DIRECT_INPUT_KEYS.slice(),
+                    outputKeys: stats ? stats.outputKeys : this.DIRECT_OUTPUT_KEYS.slice()
+                };
+            }
+            const keys = (stats && stats.inputKeys) || this.DIRECT_INPUT_KEYS;
+            const outKeys = (stats && stats.outputKeys) || this.DIRECT_OUTPUT_KEYS;
+            const mins = stats.mins;
+            const maxs = stats.maxs;
 
             const inputs = samples.map(s => keys.map(k => {
                 const range = maxs[k] - mins[k];
@@ -228,7 +259,12 @@
                 return range > 1e-9 ? (s[k] - mins[k]) / range : 0;
             }));
 
-            return { inputs, targets, mins, maxs };
+            return { inputs, targets, mins, maxs, inputKeys: keys.slice(), outputKeys: outKeys.slice() };
+        },
+
+        normalizeInputs(samples) {
+            const stats = this.fitDirectStats(samples);
+            return this.normalizeDirectWithStats(samples, stats);
         },
 
         denormalize(output, mins, maxs, outKeys) {
@@ -237,6 +273,26 @@
                 const range = maxs[k] - mins[k];
                 return output[i] * range + mins[k];
             });
+        },
+
+        saveDirectBundle(key, bundle) {
+            if (!bundle || !bundle.model || !bundle.stats) return;
+            try {
+                localStorage.setItem('nn_bundle_' + key, JSON.stringify(bundle));
+            } catch (_) {}
+        },
+
+        loadDirectBundle(key) {
+            try {
+                const raw = localStorage.getItem('nn_bundle_' + key);
+                if (!raw) return null;
+                const bundle = JSON.parse(raw);
+                if (!bundle || !bundle.model || !bundle.stats) return null;
+                bundle.nn = NeuralNetwork.fromJSON(bundle.model);
+                return bundle;
+            } catch (_) {
+                return null;
+            }
         },
 
         normalizeInverse(samples) {

@@ -90,9 +90,11 @@
 <script>
 (function() {
     var dataset = null;       // raw samples from physics simulator
-    var normData = null;     // normalized {inputs, targets, mins, maxs}
+    var splitData = null;    // {train, val, test}
+    var normData = null;     // normalized split with shared train stats
     var nn = null;           // trained network
     var lossHistory = [];
+    var savedTop5 = [];
 
     document.getElementById('btnGenerate').addEventListener('click', startGeneration);
 
@@ -107,6 +109,9 @@
 
         btn.disabled = true;
         dataset = [];
+        splitData = null;
+        normData = null;
+        savedTop5 = [];
         var genStart = Date.now();
         var genIndex = 0;
         var chunkSize = 200;
@@ -163,6 +168,97 @@
 
     document.getElementById('btnTrain').addEventListener('click', trainNetwork);
 
+    function shuffleCopy(items) {
+        var out = items.slice();
+        for (var i = out.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = out[i];
+            out[i] = out[j];
+            out[j] = tmp;
+        }
+        return out;
+    }
+
+    function splitDataset(samples) {
+        var shuffled = shuffleCopy(samples);
+        var trainEnd = Math.max(1, Math.floor(shuffled.length * 0.70));
+        var valEnd = Math.max(trainEnd + 1, Math.floor(shuffled.length * 0.85));
+        return {
+            train: shuffled.slice(0, trainEnd),
+            val: shuffled.slice(trainEnd, valEnd),
+            test: shuffled.slice(valEnd)
+        };
+    }
+
+    function prepareNormData() {
+        splitData = splitDataset(dataset);
+        var stats = BallisticsNN.fitDirectStats(splitData.train);
+        normData = {
+            stats: stats,
+            train: BallisticsNN.normalizeDirectWithStats(splitData.train, stats),
+            val: BallisticsNN.normalizeDirectWithStats(splitData.val, stats),
+            test: BallisticsNN.normalizeDirectWithStats(splitData.test, stats)
+        };
+    }
+
+    function computeMSE(model, inputs, targets) {
+        if (!model || !inputs || inputs.length === 0) return 0;
+        var sum = 0;
+        var n = 0;
+        for (var i = 0; i < inputs.length; i++) {
+            var pred = model.predict(inputs[i]);
+            for (var j = 0; j < pred.length; j++) {
+                var d = pred[j] - targets[i][j];
+                sum += d * d;
+                n++;
+            }
+        }
+        return n ? sum / n : 0;
+    }
+
+    function percentile(sorted, p) {
+        if (!sorted.length) return 0;
+        var idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+        return sorted[idx];
+    }
+
+    function buildPredictionRows(model, normalized, samples, limit) {
+        var rows = [];
+        var count = Math.min(limit || samples.length, samples.length, normalized.inputs.length);
+        for (var i = 0; i < count; i++) {
+            var s = samples[i];
+            var pred = model.predict(normalized.inputs[i]);
+            var denorm = BallisticsNN.denormalize(pred, normalized.mins, normalized.maxs, normalized.outputKeys);
+            var predRange = denorm[0];
+            var absErr = Math.abs(predRange - s.range);
+            var err = absErr / Math.max(1, Math.abs(s.range)) * 100;
+            rows.push({ s: s, predRange: Math.round(predRange), absErr: absErr, err: err });
+        }
+        return rows;
+    }
+
+    function summarizeRows(rows) {
+        if (!rows.length) return { mae: 0, rmse: 0, p50: 0, p90: 0, p99: 0, avgPct: 0 };
+        var abs = rows.map(function(r) { return r.absErr; }).sort(function(a, b) { return a - b; });
+        var sq = rows.reduce(function(sum, r) { return sum + r.absErr * r.absErr; }, 0);
+        var pct = rows.reduce(function(sum, r) { return sum + r.err; }, 0);
+        return {
+            mae: abs.reduce(function(sum, v) { return sum + v; }, 0) / abs.length,
+            rmse: Math.sqrt(sq / rows.length),
+            p50: percentile(abs, 50),
+            p90: percentile(abs, 90),
+            p99: percentile(abs, 99),
+            avgPct: pct / rows.length
+        };
+    }
+
+    function metricsText(metrics) {
+        if (!metrics) return '';
+        return 'MAE ' + Math.round(metrics.mae) + ' m, RMSE ' + Math.round(metrics.rmse) +
+            ' m, P90 ' + Math.round(metrics.p90) + ' m, P99 ' + Math.round(metrics.p99) +
+            ' m, средн. ' + metrics.avgPct.toFixed(1) + '%';
+    }
+
     function trainNetwork() {
         if (!dataset || dataset.length === 0) return;
         var epochs = Number(document.getElementById('trainEpochs').value) || 50;
@@ -171,41 +267,61 @@
 
         document.getElementById('btnTrain').disabled = true;
         document.getElementById('trainStat').textContent = 'Нормализация...';
-        normData = BallisticsNN.normalizeInputs(dataset);
+        prepareNormData();
         nn = BallisticsNN.createDirect();
         lossHistory = [];
         var trainStart = Date.now();
+        document.getElementById('trainStat').textContent =
+            'Разбиение: train ' + splitData.train.length + ', val ' + splitData.val.length + ', test ' + splitData.test.length;
 
         var currentEpoch = 0;
         function trainChunk() {
             var chunkStart = Date.now();
-            var chunkSize = 5;
-            var history = nn.train(normData.inputs, normData.targets, {
+            var chunkSize = Math.min(5, epochs - currentEpoch);
+            nn.train(normData.train.inputs, normData.train.targets, {
                 lr: lr,
                 epochs: chunkSize,
                 batchSize: batch,
                 activation: 'relu',
                 onEpoch: function(epoch, loss) {
-                    lossHistory.push({ epoch: currentEpoch + epoch, loss: loss });
+                    var valLoss = computeMSE(nn, normData.val.inputs, normData.val.targets);
+                    lossHistory.push({ epoch: currentEpoch + epoch, loss: loss, valLoss: valLoss });
                 }
             });
             currentEpoch += chunkSize;
             var elapsed = ((Date.now() - trainStart) / 1000);
             var rate = currentEpoch / Math.max(1, elapsed);
             var remaining = Math.round((epochs - currentEpoch) / Math.max(1, rate));
+            var lastLoss = lossHistory[lossHistory.length - 1] || { loss: 0, valLoss: 0 };
             document.getElementById('trainTimer').textContent = 'осталось ~' + remaining + ' с';
             document.getElementById('trainStat').textContent =
                 'Эпоха ' + currentEpoch + '/' + epochs + ' — loss: ' + (lossHistory[lossHistory.length - 1]?.loss || 0).toFixed(6);
+
+            document.getElementById('trainStat').textContent =
+                'Эпоха ' + currentEpoch + '/' + epochs + ' - train: ' + lastLoss.loss.toFixed(6) +
+                ', val: ' + lastLoss.valLoss.toFixed(6);
 
             if (currentEpoch < epochs) {
                 setTimeout(trainChunk, 10);
             } else {
                 var totalTime = ((Date.now() - trainStart) / 1000).toFixed(1);
+                var testRows = buildPredictionRows(nn, normData.test, splitData.test);
+                var metrics = summarizeRows(testRows);
                 document.getElementById('trainTimer').textContent = 'готово (' + totalTime + ' с)';
                 document.getElementById('trainStat').textContent =
                     'Завершено! Эпох: ' + epochs + ', финальный loss: ' + lossHistory[lossHistory.length - 1].loss.toFixed(6) + ', время: ' + totalTime + ' с';
                 document.getElementById('testPanel').style.display = '';
                 document.getElementById('btnTrain').disabled = false;
+                document.getElementById('trainStat').textContent =
+                    'Готово. ' + metricsText(metrics) + ', время: ' + totalTime + ' с';
+                BallisticsNN.saveDirectBundle('direct_ballistics', {
+                    version: 1,
+                    createdAt: new Date().toISOString(),
+                    model: nn.toJSON(),
+                    stats: normData.stats,
+                    metrics: metrics,
+                    testSamples: splitData.test.slice(0, 2000)
+                });
                 nn.save('direct_ballistics');
                 drawLossChart();
             }
@@ -246,6 +362,24 @@
 
     function runTest() {
         if (!nn || !normData) return;
+        if (!splitData || !splitData.test || !normData.test || splitData.test.length === 0) return;
+        var rowsAll = buildPredictionRows(nn, normData.test, splitData.test);
+        var metrics = summarizeRows(rowsAll);
+        var worst = rowsAll.slice().sort(function(a, b) { return b.err - a.err; }).slice(0, 25);
+        var table = document.getElementById('testTable');
+        var html = '<tr><th>#</th><th>V0</th><th>Угол</th><th>Дальность сим</th><th>Дальность NN</th><th>Абс. ошибка</th><th>Ошибка %</th></tr>';
+        worst.forEach(function(r, i) {
+            html += '<tr><td>'+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td>'+
+                '<td class="val">'+r.s.range+'</td><td class="val">'+r.predRange+'</td>'+
+                '<td class="err">'+Math.round(r.absErr)+' m</td>'+
+                '<td class="'+(r.err<5?'good':'err')+'">'+r.err.toFixed(1)+'%</td></tr>';
+        });
+        html += '<tr><td colspan="3"><b>Отложенный test: '+rowsAll.length+' выстрелов</b></td>'+
+            '<td colspan="4" class="'+(metrics.avgPct<5?'good':'err')+'"><b>'+metricsText(metrics)+'</b></td></tr>';
+        table.innerHTML = html;
+        document.getElementById('top5block').innerHTML =
+            '<div class="stat">Показаны худшие 25 случаев из отложенной test-выборки, не из обучения.</div>';
+        return;
         var table = document.getElementById('testTable');
         var rows = [];
         var totalErr = 0;
@@ -277,6 +411,25 @@
 
     function runTop5() {
         if (!nn || !normData) return;
+        if (!splitData || !splitData.test || !normData.test || splitData.test.length === 0) return;
+        var rowsAll = buildPredictionRows(nn, normData.test, splitData.test);
+        rowsAll.sort(function(a,b) { return a.err - b.err; });
+        var top5 = rowsAll.slice(0, 5);
+        var html = '<h3 style="color:#4ecb71;margin-top:8px">Топ-5 лучших совпадений holdout</h3>';
+        html += '<div class="stat">Только диагностика: это лучшие случаи на test-данных, не общая оценка качества.</div>';
+        html += '<table class="compare-table"><tr style="background:rgba(78,203,113,0.1)"><th>#</th><th>V0</th><th>Угол</th><th>h0</th><th>Азимут</th><th>Дальность сим</th><th>Дальность NN</th><th>Ошибка</th></tr>';
+        top5.forEach(function(r, i) {
+            html += '<tr style="background:rgba(78,203,113,'+(0.08-i*0.012)+')">'+
+                '<td class="good">#'+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td><td>'+r.s.h0+'</td><td>'+r.s.azimuth+'</td>'+
+                '<td class="val">'+r.s.range+'</td><td class="val">'+r.predRange+'</td>'+
+                '<td class="good"><b>'+r.err.toFixed(2)+'%</b></td></tr>';
+        });
+        var avgTop = top5.reduce(function(s,r){return s+r.err;},0)/Math.max(1, top5.length);
+        html += '<tr><td colspan="5"><b>Средняя ошибка топ-5</b></td><td colspan="3" class="good"><b>'+avgTop.toFixed(2)+'%</b></td></tr>';
+        html += '</table>';
+        document.getElementById('top5block').innerHTML = html;
+        savedTop5 = top5;
+        return;
         var rows = [];
         for (var i = 0; i < 200; i++) {
             var idx = Math.floor(Math.random() * dataset.length);
@@ -338,11 +491,25 @@
     document.getElementById('btnLoadTop5').addEventListener('click', loadTop5);
 
     // Try to load saved model
-    var saved = NeuralNetwork.load('direct_ballistics');
+    var bundle = BallisticsNN.loadDirectBundle('direct_ballistics');
+    if (bundle) {
+        nn = bundle.nn;
+        splitData = { train: [], val: [], test: bundle.testSamples || [] };
+        normData = {
+            stats: bundle.stats,
+            test: BallisticsNN.normalizeDirectWithStats(splitData.test, bundle.stats)
+        };
+        document.getElementById('trainPanel').style.display = '';
+        document.getElementById('testPanel').style.display = '';
+        document.getElementById('trainStat').textContent =
+            'Загружена сохраненная модель (слои: ' + nn.layers.join(' -> ') + '). ' + metricsText(bundle.metrics);
+    }
+    var saved = nn ? null : NeuralNetwork.load('direct_ballistics');
     if (saved) {
         nn = saved;
         document.getElementById('trainPanel').style.display = '';
-        document.getElementById('testPanel').style.display = '';
+        document.getElementById('testPanel').style.display = 'none';
+        // Legacy weights were saved without normalization stats and cannot be evaluated honestly after reload.
         document.getElementById('trainStat').textContent = 'Загружена сохранённая модель (слои: ' + nn.layers.join('→') + ')';
     }
 })();

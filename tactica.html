@@ -218,6 +218,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         (function () {
             const canvas = document.getElementById('sceneCanvas');
             const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -230,6 +231,19 @@
             camera.position.set(-12000, 9000, -12000);
             camera.lookAt(0, 0, 0);
 
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.enableDamping = false;
+            controls.enablePan = true;
+            controls.enableZoom = true;
+            controls.screenSpacePanning = false;
+            controls.mouseButtons = {
+                LEFT: null,
+                MIDDLE: THREE.MOUSE.PAN,
+                RIGHT: THREE.MOUSE.ROTATE
+            };
+            controls.update();
+
             const ambient = new THREE.AmbientLight(0x202030, 0.15);
             const hemi = new THREE.HemisphereLight(0xc8c0e0, 0x101820, 0.3);
             const sun = new THREE.DirectionalLight(0xffc080, 3.0);
@@ -237,6 +251,7 @@
             scene.add(ambient, hemi, sun);
 
             let coordinateGrid = null;
+            let originMarker = null;
 
             function setCoordinateGrid(box) {
                 if (coordinateGrid) {
@@ -256,7 +271,7 @@
                 coordinateGrid = new THREE.GridHelper(gridSize, divisions, 0x4cc9a4, 0x31414a);
                 coordinateGrid.position.set(
                     box ? (box.min.x + box.max.x) * 0.5 : 0,
-                    box ? box.min.y - 2 : -2,
+                    box ? box.min.y - 2 : 0,
                     box ? (box.min.z + box.max.z) * 0.5 : 0
                 );
                 coordinateGrid.renderOrder = -10;
@@ -282,13 +297,15 @@
             let shotCounter = 0;
             let targetModels = [];
             let selectedTarget = null;
+            let targetWorld = null;
             let shot = null;
             let shotRunning = false;
             let shotPaused = false;
             let shotTime = 0;
+            let solvingTarget = false;
             const DT_SIM = 0.02;
             let terrainScale = 1.0;
-            const gunOffset = { x: 353, z: 353 }; // 500m diagonal at 45°
+            const gunOffset = { x: 0, z: 0 };
 
             function buildHeightGrid(mesh) {
                 const gridSize = 512;
@@ -352,12 +369,46 @@
                 return vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
             }
 
-            // Override physics.js landing
-            window._terrainHeightFn = function(x, z) { return getTerrainH(x, z); };
+            function shotToWorldPoint(p) {
+                return new THREE.Vector3(p.x + gunOffset.x, p.y + 8, p.z + gunOffset.z);
+            }
+
+            function terrainHeightForShot(localX, localZ) {
+                return getTerrainH(gunOffset.x + localX, gunOffset.z + localZ);
+            }
+
+            function bearingDegToWorldPoint(wx, wz) {
+                const dx = wx - gunOffset.x;
+                const dz = wz - gunOffset.z;
+                return (Math.atan2(dz, dx) * 180 / Math.PI + 360) % 360;
+            }
+
+            function gunGroundHeight() {
+                return getTerrainH(gunOffset.x, gunOffset.z);
+            }
+
+            function syncGunToTerrain() {
+                const h = gunGroundHeight();
+                if (gunMarker) gunMarker.position.set(gunOffset.x, h, gunOffset.z);
+                if (gunRing) gunRing.position.set(gunOffset.x, h, gunOffset.z);
+                document.getElementById('h0').value = Math.round(h);
+                return h;
+            }
+
+            function setTargetWorld(wx, wz) {
+                const h = getTerrainH(wx, wz);
+                targetWorld = { x: wx, y: h, z: wz };
+                return targetWorld;
+            }
+
+            // Physics works in shot-local X/Z. Terrain is stored in world X/Z.
+            window._terrainHeightFn = function(x, z) { return terrainHeightForShot(x, z); };
 
             function createTrajectoryLine() {
-                trajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2.2 }));
-                previewLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xf0b24f, linewidth: 2.5 }));
+                trajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00aaff, linewidth: 3, transparent: true, opacity: 1 }));
+                previewLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x24c8ff, linewidth: 3.5, transparent: true, opacity: 1 }));
+                trajectoryLine.renderOrder = 20;
+                previewLine.renderOrder = 21;
                 scene.add(trajectoryLine);
                 scene.add(previewLine);
                 targetMarker = new THREE.Group();
@@ -369,7 +420,6 @@
                 scene.add(targetMarker);
                 // Gun position marker
                 gunMarker = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4cc9a4 }));
-                gunMarker.position.set(gunOffset.x, getTerrainH(gunOffset.x, gunOffset.z), gunOffset.z);
                 scene.add(gunMarker);
                 // Red glowing ring 500m diameter
                 gunRing = new THREE.Group();
@@ -380,8 +430,8 @@
                 const glowRing = new THREE.Mesh(new THREE.TorusGeometry(500, 8, 16, 100), glowMat);
                 glowRing.rotation.x = Math.PI / 2;
                 gunRing.add(glowRing, mainRing);
-                gunRing.position.copy(gunMarker.position);
                 scene.add(gunRing);
+                syncGunToTerrain();
                 // 3D projectile model
                 projectileDot = new THREE.Group();
                 const body = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 4.2, 24), new THREE.MeshStandardMaterial({ color: 0xd7dde0, roughness: 0.48, metalness: 0.25 }));
@@ -399,7 +449,7 @@
             function rebuildPreview() {
                 const v0 = Number(document.getElementById('v0').value) || 655;
                 const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = Math.max(10, Number(document.getElementById('h0').value) || 0);
+                const h0 = syncGunToTerrain();
                 const azimuth = Number(document.getElementById('azimuth').value) || 0;
                 const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
                 const mass = Number(document.getElementById('mass').value) || 43.5;
@@ -413,22 +463,17 @@
                     const airShot = new Projectile(v0, angle, h0, azimuth, p);
                     airShot.run(p.maxTime, p.dt);
                     if (previewLine) {
-                        const pts = airShot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z));
+                        const pts = airShot.trail.map(shotToWorldPoint);
                         previewLine.geometry.dispose();
                         previewLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
                     }
                     // Save to history
-                    const histGeo = new THREE.BufferGeometry().setFromPoints(airShot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z)));
-                    const alpha = 0.3 + (trajectoryHistory.length % 10) * 0.05;
-                    const histLine = new THREE.Line(histGeo, new THREE.LineBasicMaterial({ color: 0xf0b24f, transparent: true, opacity: alpha }));
-                    trajectoryHistory.push(histLine);
-                    scene.add(histLine);
                     // Vacuum trajectory — not rendered
                     const vacHit = analyticVacuumImpact(v0, angle, h0);
                     // Target marker at predicted impact
                     if (targetMarker && airShot.trail.length > 0) {
                         const imp = airShot.trail[airShot.trail.length - 1];
-                        targetMarker.position.set(imp.x + gunOffset.x, imp.y, imp.z + gunOffset.z);
+                        targetMarker.position.copy(shotToWorldPoint(imp));
                         targetMarker.visible = true;
                     }
                 } catch(err) {
@@ -441,9 +486,8 @@
                 if (shotPaused) { shotPaused = false; document.getElementById('runState').textContent = 'Полет'; return; }
                 const v0 = Number(document.getElementById('v0').value) || 655;
                 const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = Number(document.getElementById('h0').value) || 0;
-                const groundH = getTerrainH(gunOffset.x, gunOffset.z);
-                const effectiveH0 = h0; // h0 is absolute, use terrain height from input
+                const h0 = syncGunToTerrain();
+                const effectiveH0 = h0;
                 const azimuth = Number(document.getElementById('azimuth').value) || 0;
                 const windX = Number(document.getElementById('windX').value) || 0;
                 const windY = Number(document.getElementById('windY').value) || 0;
@@ -512,9 +556,30 @@
             }
 
             function findAngleForTarget() {
+                if (solvingTarget) return;
+                solvingTarget = true;
                 const targetRange = Number(document.getElementById('targetRange').value) || 15000;
                 const v0 = Number(document.getElementById('v0').value) || 655;
-                const h0 = Number(document.getElementById('h0').value) || 0;
+                const h0 = syncGunToTerrain();
+                if (targetWorld) {
+                    const targetAzimuth = bearingDegToWorldPoint(targetWorld.x, targetWorld.z);
+                    const targetLocalX = targetWorld.x - gunOffset.x;
+                    const targetLocalZ = targetWorld.z - gunOffset.z;
+                    setAzimuth(targetAzimuth);
+                    let bestTerrainAngle = 45, bestTerrainDiff = Infinity;
+                    for (let a = 5; a <= 85; a += 0.5) {
+                        const p = { ...params, angle: a, h0, v0, azimuth: targetAzimuth };
+                        const s = new Projectile(v0, a, h0, targetAzimuth, p);
+                        s.run(p.maxTime || 300, p.dt || 0.02);
+                        const hit = s.trail[s.trail.length - 1] || { x: 0, z: 0 };
+                        const diff = Math.hypot(hit.x - targetLocalX, hit.z - targetLocalZ);
+                        if (diff < bestTerrainDiff) { bestTerrainDiff = diff; bestTerrainAngle = a; }
+                    }
+                    document.getElementById('angle').value = Math.round(bestTerrainAngle * 10) / 10;
+                    rebuildPreview();
+                    solvingTarget = false;
+                    return;
+                }
                 let bestAngle = 45, bestDiff = Infinity;
                 for (let a = 5; a <= 85; a += 0.5) {
                     const p = { ...params, angle: a, h0, v0 };
@@ -525,12 +590,13 @@
                 }
                 document.getElementById('angle').value = Math.round(bestAngle * 10) / 10;
                 rebuildPreview();
+                solvingTarget = false;
             }
 
             function setTargetToPrediction() {
                 const v0 = Number(document.getElementById('v0').value) || 655;
                 const angle = Number(document.getElementById('angle').value) || 45;
-                const h0 = Number(document.getElementById('h0').value) || 0;
+                const h0 = syncGunToTerrain();
                 const p = { ...params, angle, h0, v0 };
                 const s = new Projectile(v0, angle, h0, params.azimuth || 0, p);
                 s.run(p.maxTime || 300, p.dt || 0.02);
@@ -547,14 +613,14 @@
                 }
                 // Update trajectory line
                 if (shot.trail.length >= 2 && trajectoryLine) {
-                    const pts = shot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z));
+                    const pts = shot.trail.map(shotToWorldPoint);
                     trajectoryLine.geometry.dispose();
                     trajectoryLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
                 }
                 // Update projectile dot
                 if (projectileDot && shot.trail.length > 0) {
                     const p = shot.trail[shot.trail.length - 1];
-                    projectileDot.position.set(p.x + gunOffset.x, p.y, p.z + gunOffset.z);
+                    projectileDot.position.copy(shotToWorldPoint(p));
                     projectileDot.visible = true;
                     if (shot.vx !== undefined) {
                         const dir = new THREE.Vector3(shot.vx, shot.vy, shot.vz).normalize();
@@ -579,7 +645,7 @@
                     const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
                     impactLabel = new THREE.Sprite(spriteMat);
                     impactLabel.scale.set(3000, 750, 1);
-                    impactLabel.position.set(p.x + gunOffset.x, p.y + 60, p.z + gunOffset.z);
+                    impactLabel.position.copy(shotToWorldPoint({ x: p.x, y: p.y + 60, z: p.z }));
                     scene.add(impactLabel);
                     shotRunning = false;
                     document.getElementById('runState').textContent = 'Попадание';
@@ -611,11 +677,94 @@
                     orbit.target.y + orbit.distance * Math.sin(orbit.pitch),
                     orbit.target.z + sp * Math.cos(orbit.yaw)
                 );
-                camera.lookAt(orbit.target);
+                controls.target.copy(orbit.target);
+                controls.minDistance = orbit.minDist;
+                controls.maxDistance = orbit.maxDist;
+                controls.update();
+            }
+
+            function syncOrbitFromCamera() {
+                orbit.target.copy(controls.target);
+                const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+                const distance = Math.max(orbit.minDist, Math.min(orbit.maxDist, offset.length()));
+                orbit.distance = distance;
+                if (distance > 0.001) {
+                    orbit.pitch = Math.max(-0.1, Math.min(1.15, Math.asin(offset.y / distance)));
+                    orbit.yaw = Math.atan2(offset.x, offset.z);
+                }
+            }
+
+            function reanchorOrbitToScreenCenter() {
+                const centerRaycaster = new THREE.Raycaster();
+                centerRaycaster.far = 500000;
+                centerRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+                if (terrainMesh) {
+                    const hits = centerRaycaster.intersectObject(terrainMesh, true);
+                    if (hits.length > 0) {
+                        orbit.target.copy(hits[0].point);
+                        syncOrbitFromCamera();
+                        return;
+                    }
+                }
+
+                const planeY = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const point = new THREE.Vector3();
+                if (centerRaycaster.ray.intersectPlane(planeY, point)) {
+                    orbit.target.copy(point);
+                    syncOrbitFromCamera();
+                }
             }
 
             function buildTerrainMesh() {
                 return null; // replaced by FBX loader
+            }
+
+            function createOriginMarker() {
+                const group = new THREE.Group();
+                group.name = 'Coordinate origin marker';
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(90, 24, 16),
+                    new THREE.MeshBasicMaterial({ color: 0xf0b24f })
+                );
+                sphere.position.set(0, 90, 0);
+                const xLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-500, 6, 0), new THREE.Vector3(500, 6, 0)]),
+                    new THREE.LineBasicMaterial({ color: 0xf25f5c })
+                );
+                const yLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 700, 0)]),
+                    new THREE.LineBasicMaterial({ color: 0x4ecb71 })
+                );
+                const zLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 6, -500), new THREE.Vector3(0, 6, 500)]),
+                    new THREE.LineBasicMaterial({ color: 0x5bc8f0 })
+                );
+                group.add(sphere, xLine, yLine, zLine);
+                return group;
+            }
+
+            function resetToCoordinateGrid() {
+                if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
+                if (originMarker) { scene.remove(originMarker); originMarker = null; }
+                heightGrid = null;
+                targetWorld = null;
+                gunOffset.x = 0;
+                gunOffset.z = 0;
+                setCoordinateGrid(null);
+                originMarker = createOriginMarker();
+                scene.add(originMarker);
+                document.getElementById('fileName').textContent = 'сетка Y=0';
+                orbit.target.set(0, 0, 0);
+                orbit.distance = 24000;
+                orbit.yaw = -2.36;
+                orbit.pitch = 0.42;
+                orbit.minDist = 100;
+                orbit.maxDist = 150000;
+                updateCamera();
+                syncGunToTerrain();
+                if (!trajectoryLine) createTrajectoryLine();
+                rebuildPreview();
             }
 
             function loadOBJTerrain(path) {
@@ -625,6 +774,7 @@
                 loader.load(path, function(object) {
                     console.log('OBJ: loaded');
                     if (terrainMesh) { scene.remove(terrainMesh); }
+                    if (originMarker) { scene.remove(originMarker); originMarker = null; }
                     terrainMesh = object;
                     const mat = new THREE.MeshStandardMaterial({
                         color: 0x888888,
@@ -667,8 +817,7 @@
                     orbit.minDist = orbit.distance * 0.3;
                     orbit.maxDist = orbit.distance * 4;
                     updateCamera();
-                    document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
-                    if (gunRing) gunRing.position.copy(gunMarker.position);
+                    syncGunToTerrain();
                     rebuildPreview();
                 }, undefined, function(err) {
                     console.error('OBJ: load error', err);
@@ -715,67 +864,11 @@
             }
 
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-            canvas.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                canvas.setPointerCapture(e.pointerId);
-                dragState = {
-                    mode: e.button === 1 || e.button === 2 ? 'pan' : 'orbit',
-                    x: e.clientX,
-                    y: e.clientY,
-                    startX: e.clientX,
-                    startY: e.clientY,
-                    yaw: orbit.yaw,
-                    pitch: orbit.pitch,
-                    target: orbit.target.clone()
-                };
+            canvas.addEventListener('click', (e) => {
+                if (e.button !== 0) return;
+                if (placeMode === 'gun') placeGun(e);
+                else if (placeMode === 'target') placeTargetClick(e);
             });
-            canvas.addEventListener('pointermove', (e) => {
-                if (!dragState) return;
-                const dx = e.clientX - dragState.x;
-                const dy = e.clientY - dragState.y;
-
-                if (dragState.mode === 'pan') {
-                    const panScale = orbit.distance * 0.0018;
-                    const forward = new THREE.Vector3().subVectors(orbit.target, camera.position).normalize();
-                    const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-                    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-                    orbit.target.copy(dragState.target)
-                        .addScaledVector(right, -dx * panScale)
-                        .addScaledVector(up, dy * panScale);
-                } else {
-                    orbit.yaw = dragState.yaw - dx * 0.006;
-                    orbit.pitch = Math.max(-0.1, Math.min(1.15, dragState.pitch + dy * 0.004));
-                }
-                updateCamera();
-            });
-
-            canvas.addEventListener('pointerup', (e) => {
-                if (canvas.hasPointerCapture(e.pointerId)) {
-                    canvas.releasePointerCapture(e.pointerId);
-                }
-                if (dragState) {
-                    const dx = e.clientX - dragState.startX;
-                    const dy = e.clientY - dragState.startY;
-                    const moved = Math.hypot(dx, dy) > 3;
-                    if (!moved && terrainMesh) {
-                        if (e.button === 0) {
-                            if (placeMode === 'gun') placeGun(e);
-                            else if (placeMode === 'target') placeTargetClick(e);
-                        } else if (e.button === 2) {
-                            placeTargetClick(e);
-                        }
-                    }
-                }
-                dragState = null;
-            });
-            canvas.addEventListener('pointercancel', () => {
-                dragState = null;
-            });
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                orbit.distance = Math.max(orbit.minDist, Math.min(orbit.maxDist, orbit.distance * (1 + e.deltaY * 0.001)));
-                updateCamera();
-            }, { passive: false });
             window.addEventListener('resize', resize);
 
             document.getElementById('btnLoad').addEventListener('click', () => document.getElementById('terrainFile').click());
@@ -783,10 +876,12 @@
                 if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
                 document.getElementById('fileName').textContent = '—';
                 heightGrid = null;
+                targetWorld = null;
                 setCoordinateGrid(null);
                 trajectoryHistory.forEach(function(l) { scene.remove(l); });
                 trajectoryHistory = [];
                 resetShot();
+                resetToCoordinateGrid();
             });
             document.getElementById('terrainFile').addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -819,9 +914,14 @@
                 setCoordinateGrid(box3);
                 console.log('Scaled: 1 unit =', newScale, 'm, terrain', worldSize.toFixed(0), 'x', worldSize.toFixed(0));
                 buildHeightGrid(terrainMesh);
-                document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
-                if (gunMarker) gunMarker.position.set(gunOffset.x, getTerrainH(gunOffset.x, gunOffset.z), gunOffset.z);
-                if (gunRing) gunRing.position.copy(gunMarker.position);
+                syncGunToTerrain();
+                targetModels.forEach(function(model) {
+                    model.position.y = getTerrainH(model.position.x, model.position.z);
+                });
+                if (targetWorld) {
+                    setTargetWorld(targetWorld.x, targetWorld.z);
+                    updateTargetRange(targetWorld.x, targetWorld.z);
+                }
                 const centeredBox = new THREE.Box3().setFromObject(terrainMesh);
                 orbit.target.copy(terrainOrbitTarget(centeredBox));
                 orbit.distance = worldSize * 1.5;
@@ -1124,7 +1224,8 @@
 
             function placeTargetModel(wx, wz) {
                 if (!selectedTarget) return;
-                var h = getTerrainH(wx, wz);
+                var target = setTargetWorld(wx, wz);
+                var h = target.y;
                 if (selectedTarget === 'msta') {
                     var loader = new OBJLoader();
                     loader.load('Models/MSTA-S/2S19 MSTA.obj', function(obj) {
@@ -1147,13 +1248,14 @@
             function addTargetRing(model, wx, h, wz) {
                 var ring = new THREE.Mesh(new THREE.TorusGeometry(100, 2, 8, 48), new THREE.MeshBasicMaterial({color:0xf25f5c}));
                 ring.rotation.x = Math.PI/2;
-                ring.position.set(wx, h+0.5, wz);
+                ring.position.set(0, 0.5, 0);
                 model.add(ring);
             }
             function updateTargetRange(wx, wz) {
+                if (!targetWorld || targetWorld.x !== wx || targetWorld.z !== wz) setTargetWorld(wx, wz);
                 var dx = wx - gunOffset.x, dz = wz - gunOffset.z;
                 document.getElementById('targetRange').value = Math.round(Math.hypot(dx, dz));
-                rebuildPreview();
+                findAngleForTarget();
             }
 
             // ── Simulation training block ────────────────────────────────────
@@ -1170,16 +1272,20 @@
 
             var btnModeGun = document.getElementById('btnModeGun');
             var btnModeTarget = document.getElementById('btnModeTarget');
-            btnModeGun.addEventListener('click', function() {
-                placeMode = 'gun';
+            btnModeGun.title = 'Поставить орудие левым кликом по ландшафту';
+            btnModeTarget.title = 'Поставить цель левым кликом по ландшафту';
+            function updatePlaceModeUi() {
                 btnModeGun.style.background = 'rgba(78,203,113,0.2)'; btnModeGun.style.borderColor = '#4ecb71'; btnModeGun.style.color = '#4ecb71';
                 btnModeTarget.style.background = ''; btnModeTarget.style.borderColor = ''; btnModeTarget.style.color = '';
-            });
-            btnModeTarget.addEventListener('click', function() {
-                placeMode = 'target';
-                btnModeTarget.style.background = 'rgba(242,95,92,0.2)'; btnModeTarget.style.borderColor = '#f25f5c'; btnModeTarget.style.color = '#f25f5c';
-                btnModeGun.style.background = ''; btnModeGun.style.borderColor = ''; btnModeGun.style.color = '';
-            });
+                if (placeMode === 'target') {
+                    btnModeTarget.style.background = 'rgba(242,95,92,0.2)'; btnModeTarget.style.borderColor = '#f25f5c'; btnModeTarget.style.color = '#f25f5c';
+                    btnModeGun.style.background = ''; btnModeGun.style.borderColor = ''; btnModeGun.style.color = '';
+                }
+                canvas.style.cursor = 'crosshair';
+            }
+            btnModeGun.addEventListener('click', function() { placeMode = 'gun'; updatePlaceModeUi(); });
+            btnModeTarget.addEventListener('click', function() { placeMode = 'target'; updatePlaceModeUi(); });
+            updatePlaceModeUi();
 
             function loadSimData() {
                 var raw = localStorage.getItem('nn_top5_results');
@@ -1238,8 +1344,8 @@
                             var histLine = new THREE.Line(histGeo, new THREE.LineBasicMaterial({color:color,linewidth:2,transparent:true,opacity:0.8}));
                             scene.add(histLine); simHistoryLines.push(histLine);
                         }
-                        if (previewLine) { previewLine.material.color.set(0xf0b24f); }
-                        if (trajectoryLine) { trajectoryLine.material.color.set(0xffffff); }
+                        if (previewLine) { previewLine.material.color.set(0x24c8ff); previewLine.material.opacity = 1; }
+                        if (trajectoryLine) { trajectoryLine.material.color.set(0x00aaff); trajectoryLine.material.opacity = 1; }
                         if (simIndex < simData.length && simRunning && !simPaused) setTimeout(simNextShot, 600);
                         else if (simIndex >= simData.length) { simRunning=false; simBtn.textContent='▶ Старт'; simBtn.style.background='rgba(78,203,113,0.2)'; simBtn.style.borderColor='#4ecb71'; simBtn.style.color='#4ecb71'; simStatus.textContent='Завершено'; }
                     }
@@ -1254,34 +1360,42 @@
 
             const clickRaycaster = new THREE.Raycaster();
             clickRaycaster.far = 500000;
-            function placeGun(e) {
+            function groundPointFromEvent(e) {
                 const rect = canvas.getBoundingClientRect();
+                const px = Number.isFinite(e.offsetX) ? e.offsetX : (e.clientX - rect.left);
+                const py = Number.isFinite(e.offsetY) ? e.offsetY : (e.clientY - rect.top);
+                const width = canvas.clientWidth || rect.width || 1;
+                const height = canvas.clientHeight || rect.height || 1;
                 const mouse = new THREE.Vector2(
-                    ((e.clientX - rect.left) / rect.width) * 2 - 1,
-                    -((e.clientY - rect.top) / rect.height) * 2 + 1
+                    (px / width) * 2 - 1,
+                    -(py / height) * 2 + 1
                 );
+                camera.updateMatrixWorld(true);
+                camera.updateProjectionMatrix();
                 clickRaycaster.setFromCamera(mouse, camera);
-                const hits = clickRaycaster.intersectObject(terrainMesh, true);
-                if (hits.length > 0) {
-                    gunOffset.x = hits[0].point.x;
-                    gunOffset.z = hits[0].point.z;
-                    const h = getTerrainH(gunOffset.x, gunOffset.z);
-                    if (gunMarker) gunMarker.position.set(gunOffset.x, h, gunOffset.z);
-                    if (gunRing) gunRing.position.set(gunOffset.x, h, gunOffset.z);
-                    document.getElementById('h0').value = Math.round(h);
-                    rebuildPreview();
+                if (terrainMesh) {
+                    const hits = clickRaycaster.intersectObject(terrainMesh, true);
+                    if (hits.length > 0) return hits[0].point;
+                }
+                const planeY = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const point = new THREE.Vector3();
+                return clickRaycaster.ray.intersectPlane(planeY, point) ? point : null;
+            }
+
+            function placeGun(e) {
+                const point = groundPointFromEvent(e);
+                if (point) {
+                    gunOffset.x = point.x;
+                    gunOffset.z = point.z;
+                    syncGunToTerrain();
+                    if (targetWorld) updateTargetRange(targetWorld.x, targetWorld.z);
+                    else rebuildPreview();
                 }
             }
 
             function placeTargetClick(e) {
-                var rect = canvas.getBoundingClientRect();
-                var mouse = new THREE.Vector2(
-                    ((e.clientX - rect.left) / rect.width) * 2 - 1,
-                    -((e.clientY - rect.top) / rect.height) * 2 + 1
-                );
-                clickRaycaster.setFromCamera(mouse, camera);
-                var hits = clickRaycaster.intersectObject(terrainMesh, true);
-                if (hits.length > 0) placeTargetModel(hits[0].point.x, hits[0].point.z);
+                var point = groundPointFromEvent(e);
+                if (point) placeTargetModel(point.x, point.z);
             }
 
             // Clear targets on terrain reset
@@ -1289,6 +1403,7 @@
             resetShot = function() {
                 targetModels.forEach(function(m) { scene.remove(m); });
                 targetModels = [];
+                targetWorld = null;
                 origResetFn();
             };
 
@@ -1334,13 +1449,18 @@
 
             function animate() {
                 requestAnimationFrame(animate);
+                controls.update();
+                syncOrbitFromCamera();
                 if (shotRunning) updateShot(1/60);
                 updateAxisIndicator();
+                var w = canvas.clientWidth || renderer.domElement.clientWidth || 1;
+                var h = canvas.clientHeight || renderer.domElement.clientHeight || 1;
+                renderer.setViewport(0, 0, w, h);
+                renderer.setScissorTest(false);
                 renderer.render(scene, camera);
                 // Render axis on top
                 renderer.autoClear = false;
                 renderer.clearDepth();
-                var w = renderer.domElement.width, h = renderer.domElement.height;
                 var vw = 150, vh = 150;
                 renderer.setViewport(w - vw - 10, 10, vw, vh);
                 renderer.setScissor(w - vw - 10, 10, vw, vh);
