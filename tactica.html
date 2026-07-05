@@ -236,10 +236,34 @@
             sun.position.set(-550, 180, -150);
             scene.add(ambient, hemi, sun);
 
-            const grid = new THREE.GridHelper(300, 30, 0x3e4b54, 0x273139);
-            grid.position.y = 0;
-            grid.visible = false; // скрыт — текстура показывает рельеф
-            scene.add(grid);
+            let coordinateGrid = null;
+
+            function setCoordinateGrid(box) {
+                if (coordinateGrid) {
+                    scene.remove(coordinateGrid);
+                    coordinateGrid.geometry.dispose();
+                    if (Array.isArray(coordinateGrid.material)) {
+                        coordinateGrid.material.forEach(function(material) { material.dispose(); });
+                    } else {
+                        coordinateGrid.material.dispose();
+                    }
+                }
+
+                const sizeX = box ? box.max.x - box.min.x : 35000;
+                const sizeZ = box ? box.max.z - box.min.z : 35000;
+                const gridSize = Math.max(1000, Math.ceil(Math.max(sizeX, sizeZ) / 1000) * 1000);
+                const divisions = Math.max(20, Math.min(140, Math.round(gridSize / 500)));
+                coordinateGrid = new THREE.GridHelper(gridSize, divisions, 0x4cc9a4, 0x31414a);
+                coordinateGrid.position.set(
+                    box ? (box.min.x + box.max.x) * 0.5 : 0,
+                    box ? box.min.y - 2 : -2,
+                    box ? (box.min.z + box.max.z) * 0.5 : 0
+                );
+                coordinateGrid.renderOrder = -10;
+                scene.add(coordinateGrid);
+            }
+
+            setCoordinateGrid(null);
 
             let terrainMesh = null;
             const raycaster = new THREE.Raycaster();
@@ -630,6 +654,7 @@
                     const box3 = new THREE.Box3().setFromObject(terrainMesh);
                     const center = box3.getCenter(new THREE.Vector3());
                     const size = box3.getSize(new THREE.Vector3());
+                    setCoordinateGrid(box3);
                     console.log('OBJ: ready, size', size.x.toFixed(0), 'x', size.z.toFixed(0));
                     orbit.target.copy(center);
                     orbit.distance = Math.max(size.x, size.z) * 0.7;
@@ -754,6 +779,7 @@
                 if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
                 document.getElementById('fileName').textContent = '—';
                 heightGrid = null;
+                setCoordinateGrid(null);
                 trajectoryHistory.forEach(function(l) { scene.remove(l); });
                 trajectoryHistory = [];
                 resetShot();
@@ -786,6 +812,7 @@
                 terrainMesh.updateMatrixWorld();
                 const box3 = new THREE.Box3().setFromObject(terrainMesh);
                 const worldSize = Math.max(box3.max.x - box3.min.x, box3.max.z - box3.min.z);
+                setCoordinateGrid(box3);
                 console.log('Scaled: 1 unit =', newScale, 'm, terrain', worldSize.toFixed(0), 'x', worldSize.toFixed(0));
                 buildHeightGrid(terrainMesh);
                 document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
