@@ -1,0 +1,45 @@
+
+──────────────────────────────────────────────────────────────────────────────────────────  GAEA BUILD SWARM  2.2.6.0 ──
+
+                                                                                                   
+          Filename:  │ C:/Users/ureal/Desktop/Школа_АИ_Пилот/Ballistica-main/Terrain_1001.terrain  
+    Build Location:  │ C:\Users\ureal\Desktop\Школа_АИ_Пилот\Ballistica-main                       
+        Build Type:  │ Standard                                                                    
+  Build Resolution:  │ 2048 × 2048                                                                 
+     Build Profile:  │ None / Last Saved Settings                                                  
+             Nodes:  │ 17 to build                                                                 
+                     │ 02 to export                                                                
+                                                                                                   
+
+──────────────────────────────────────────────────────────────────────────────────────────  GAEA BUILD SWARM  2.2.6.0 ──
+
+                                                                                                   
+          Filename:  │ C:/Users/ureal/Desktop/Школа_АИ_Пилот/Ballistica-main/Terrain_1001.terrain  
+    Build Location:  │ C:\Users\ureal\Desktop\Школа_АИ_Пилот\Ballistica-main                       
+        Build Type:  │ Standard                                                                    
+  Build Resolution:  │ 2048 × 2048                                                                 
+     Build Profile:  │ None / Last Saved Settings                                                  
+             Nodes:  │ 17 to build                                                                 
+                     │ 02 to export                                                                
+                                                                                                   
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────── Build Report ──
+
+              Build Results                              Statistics               
+                                                                                  
+          Result: │ Success                         Slump │ 0:00:00.608           
+      Resolution: │ 2048                           SatMap │ 0:00:00.325           
+      Node Count: │ 17                            RockMap │ 0:00:00.124           
+      Start Time: │ 07/04/2026 18:08:12         SlopeBlur │ 0:00:02.299           
+        End Time: │ 07/04/2026 18:08:32         Sandstone │ 0:00:02.963           
+        Duration: │ 00:00:19.5249490            Sandstone │ 0:00:03.325           
+  Non-Build Time: │ 00:00:02.7239489         ColorErosion │ 0:00:00.467           
+                                              TextureBase │ 0:00:00.855           
+                                                 Erosion2 │ 0:00:00.653           
+                                               Weathering │ 0:00:00.412           
+                                                   Craggy │ 0:00:04.688           
+                                                          │                       
+                                                  Fastest │ Mesher @ 0:00:00.004  
+                                                  Slowest │ Craggy @ 0:00:04.688  
+                                                                                  
+                                           * nodes that took <100ms are excluded. 

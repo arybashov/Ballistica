@@ -155,6 +155,35 @@
             }, { passive: false });
         }
 
+        raycastTerrain(event) {
+            if (!this.clickCallback || !this.terrainMesh) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const mouse = new THREE.Vector2();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            this.raycaster.setFromCamera(mouse, this.camera);
+            const hits = this.raycaster.intersectObject(this.terrainMesh);
+            if (hits.length > 0) {
+                const p = hits[0].point;
+                const wx = p.x / this.scale;
+                const wz = p.z / this.scale;
+                const h = (typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0;
+                this.clickCallback(wx, wz, h);
+            }
+        }
+
+        setOnTerrainClick(cb) {
+            this.clickCallback = cb;
+        }
+
+        setGunWorld(wx, wz, wy) {
+            this.gunWorld = { x: wx, z: wz, y: wy };
+            const h = wy != null ? wy : ((typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0);
+            this.gunMarker.position.set(wx * this.scale, h * this.scale, wz * this.scale);
+            this.gunMarker.scale.setScalar(Math.max(0.7, Math.min(2.2, 0.12 / Math.max(this.scale, 0.001))));
+            this.gunMarker.visible = true;
+        }
+
         resize() {
             const width = Math.max(1, this.canvas.clientWidth);
             const height = Math.max(1, this.canvas.clientHeight);

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica / Нейросеть — Обучение</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: rgba(11,14,16,0.95); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .topbar h1 { font-size: 18px; font-weight: 700; color: #f0b24f; margin: 0; }
+        .main { margin: 0 auto; padding: 20px; position: fixed; top: 56px; bottom: 50px; left: 0; right: 0; overflow-y: auto; }
+        .panel { background: rgba(17,22,27,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 12px; max-width: 900px; margin-left: auto; margin-right: auto; }
+        h2 { color: #c8cdd0; font-size: 16px; margin: 0 0 10px; }
+        .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+        button { padding: 6px 14px; border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; background: rgba(10,12,15,0.65); color: #c8cdd0; cursor: pointer; font: 500 12px/1.3 inherit; }
+        button:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+        button.primary { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #fff; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        .stat { font-size: 12px; color: #889; }
+        .stat b { color: #aab; }
+        .stat.good { color: #4ecb71; }
+        .log { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 8px; font: 11px monospace; color: #889; max-height: 200px; overflow-y: auto; margin-top: 8px; white-space: pre-wrap; }
+        .loss-canvas { width: 100%; height: 200px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-top: 8px; }
+        .compare-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+        .compare-table th { background: rgba(240,178,79,0.08); color: #f0b24f; padding: 4px 8px; text-align: left; }
+        .compare-table td { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #889; }
+        .compare-table td.val { color: #aab; font-weight: 600; }
+        .compare-table td.err { color: #f25f5c; }
+        input { width: 60px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 3px; color: #ccc; padding: 2px 4px; font: 500 11px/1.3 inherit; }
+        label { font-size: 11px; color: #889; }
+    </style>
+</head>
+<body>
+<div class="topbar">
+    <h1>Ballistica / Нейросеть — Обучение</h1>
+    <div class="top-actions">
+        <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
+        <a class="top-link" href="tactica.html">Tactica</a>
+        <a class="top-link" href="network.html">Сеть</a>
+        <a class="top-link" href="training.html">Обучение</a>
+    </div>
+</div>
+
+<div class="main">
+    <div class="panel">
+        <h2>1. Генерация обучающих данных</h2>
+        <div class="row">
+            <label>Сэмплов: <input id="genSamples" type="number" value="5000" min="100" max="50000" step="100"></label>
+            <label>V₀ (м/с): <input id="genV0min" type="number" value="200" style="width:55px">–<input id="genV0max" type="number" value="800" style="width:55px"></label>
+            <label>Угол: <input id="genAngleMin" type="number" value="5" style="width:45px">–<input id="genAngleMax" type="number" value="85" style="width:45px"></label>
+            <button id="btnGenerate" class="primary">Сгенерировать</button>
+            <span id="genTimer" style="font-size:11px;color:#7fcca0;margin-left:150px"></span>
+        </div>
+        <div class="stat">Сгенерировано: <b id="statSamples">0</b> сэмплов</div>
+        <div class="log" id="genLog">Готов к генерации...</div>
+    </div>
+
+    <div class="panel" id="trainPanel" style="display:none">
+        <h2>2. Обучение сети (прямая задача)</h2>
+        <div class="row">
+            <label>Эпох: <input id="trainEpochs" type="number" value="50" min="10" max="500" step="10"></label>
+            <label>LR: <input id="trainLR" type="number" value="0.005" min="0.0001" max="0.1" step="0.001" style="width:65px"></label>
+            <label>Batch: <input id="trainBatch" type="number" value="64" min="8" max="512" step="8"></label>
+            <button id="btnTrain" class="primary">Обучить</button>
+            <span id="trainTimer" style="font-size:11px;color:#7fcca0;margin-left:150px"></span>
+        </div>
+        <div class="stat" id="trainStat"></div>
+        <canvas class="loss-canvas" id="lossCanvas" width="800" height="200"></canvas>
+    </div>
+
+    <div class="panel" id="testPanel" style="display:none">
+        <h2>3. Тестирование — прогноз vs симулятор</h2>
+        <div class="row">
+            <button id="btnTest" class="primary">Тест на 100 случайных</button>
+            <button id="btnTop5" class="primary" style="background:rgba(78,203,113,0.2);border-color:#4ecb71;color:#4ecb71">Топ-5 совпадений</button>
+            <button id="btnSaveTop5" style="background:rgba(91,200,240,0.12);border-color:#5bc8f0;color:#5bc8f0">Сохранить топ-5</button>
+            <button id="btnLoadTop5" style="background:rgba(240,178,79,0.1);border-color:#f0b24f;color:#f0b24f">Вывести сохран.</button>
+        </div>
+        <table class="compare-table" id="testTable"><tr><th>#</th><th>V₀</th><th>Угол</th><th>Дальность (сим)</th><th>Дальность (сеть)</th><th>Ошибка %</th></tr></table>
+        <div id="top5block" style="margin-top:8px"></div>
+    </div>
+</div>
+
+<footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer>
+
+<script src="physics.js"></script>
+<script src="nn.js"></script>
+
+<script>
+(function() {
+    var dataset = null;       // raw samples from physics simulator
+    var normData = null;     // normalized {inputs, targets, mins, maxs}
+    var nn = null;           // trained network
+    var lossHistory = [];
+
+    document.getElementById('btnGenerate').addEventListener('click', startGeneration);
+
+    function startGeneration() {
+        var n = Number(document.getElementById('genSamples').value) || 5000;
+        var v0Min = Number(document.getElementById('genV0min').value) || 200;
+        var v0Max = Number(document.getElementById('genV0max').value) || 800;
+        var angMin = Number(document.getElementById('genAngleMin').value) || 5;
+        var angMax = Number(document.getElementById('genAngleMax').value) || 85;
+        var log = document.getElementById('genLog');
+        var btn = document.getElementById('btnGenerate');
+
+        btn.disabled = true;
+        dataset = [];
+        var genStart = Date.now();
+        var genIndex = 0;
+        var chunkSize = 200;
+
+        function genChunk() {
+            var end = Math.min(genIndex + chunkSize, n);
+            for (var i = genIndex; i < end; i++) {
+                var v0 = Math.round(v0Min + Math.random() * (v0Max - v0Min));
+                var angle = Math.round((angMin + Math.random() * (angMax - angMin)) * 10) / 10;
+                var azimuth = Math.round(Math.random() * 360);
+                var h0 = Math.round(Math.random() * 500);
+                var windX = Math.round((Math.random() - 0.5) * 40);
+                var windY = Math.round((Math.random() - 0.5) * 20);
+                var windZ = Math.round((Math.random() - 0.5) * 40);
+                var mass = (Math.random() < 0.5) ? 43.5 : 16;
+                params.v0 = v0; params.angle = angle; params.azimuth = azimuth;
+                params.h0 = h0; params.windX = windX; params.windY = windY; params.windZ = windZ;
+                params.mass = mass; params.formFactor = 0.92; params.cdModel = 'machTable';
+                params.maxTime = 300; params.dt = 0.02;
+                var shot = new Projectile(v0, angle, h0, azimuth, params);
+                shot.run(300, 0.02);
+                dataset.push({
+                    v0, angle, azimuth, h0, windX, windY, windZ, mass,
+                    range: Math.round(shot.getHorizontalRange()),
+                    time: Math.round(shot.t * 10) / 10,
+                    impactAngle: Math.round(shot.impactAngle * 180 / Math.PI * 10) / 10,
+                    energy: Math.round(shot.getKineticEnergy() / 1000) / 1000,
+                });
+            }
+            genIndex = end;
+            var elapsed = ((Date.now() - genStart) / 1000);
+            var rate = genIndex / Math.max(1, elapsed);
+            var remaining = Math.round((n - genIndex) / Math.max(1, rate));
+            document.getElementById('genTimer').textContent = 'осталось ~' + remaining + ' с';
+            document.getElementById('statSamples').textContent = genIndex;
+            log.textContent = 'Прогресс: ' + genIndex + ' / ' + n + ' (осталось ~' + remaining + ' с)';
+
+            if (genIndex < n) {
+                setTimeout(genChunk, 1);
+            } else {
+                var totalTime = ((Date.now() - genStart) / 1000).toFixed(1);
+                document.getElementById('genTimer').textContent = 'готово (' + totalTime + ' с)';
+                log.textContent = 'Сгенерировано ' + n + ' сэмплов за ' + totalTime + ' с\n';
+                log.textContent += 'Дальность: ' + dataset[0].range + '–' + dataset[n-1].range + ' м';
+                btn.disabled = false;
+                document.getElementById('trainPanel').style.display = '';
+                document.getElementById('btnTrain').disabled = false;
+            }
+        }
+
+        log.textContent = 'Генерация...';
+        setTimeout(genChunk, 10);
+    }
+
+    document.getElementById('btnTrain').addEventListener('click', trainNetwork);
+
+    function trainNetwork() {
+        if (!dataset || dataset.length === 0) return;
+        var epochs = Number(document.getElementById('trainEpochs').value) || 50;
+        var lr = Number(document.getElementById('trainLR').value) || 0.005;
+        var batch = Number(document.getElementById('trainBatch').value) || 64;
+
+        document.getElementById('btnTrain').disabled = true;
+        document.getElementById('trainStat').textContent = 'Нормализация...';
+        normData = BallisticsNN.normalizeInputs(dataset);
+        nn = BallisticsNN.createDirect();
+        lossHistory = [];
+        var trainStart = Date.now();
+
+        var currentEpoch = 0;
+        function trainChunk() {
+            var chunkStart = Date.now();
+            var chunkSize = 5;
+            var history = nn.train(normData.inputs, normData.targets, {
+                lr: lr,
+                epochs: chunkSize,
+                batchSize: batch,
+                activation: 'relu',
+                onEpoch: function(epoch, loss) {
+                    lossHistory.push({ epoch: currentEpoch + epoch, loss: loss });
+                }
+            });
+            currentEpoch += chunkSize;
+            var elapsed = ((Date.now() - trainStart) / 1000);
+            var rate = currentEpoch / Math.max(1, elapsed);
+            var remaining = Math.round((epochs - currentEpoch) / Math.max(1, rate));
+            document.getElementById('trainTimer').textContent = 'осталось ~' + remaining + ' с';
+            document.getElementById('trainStat').textContent =
+                'Эпоха ' + currentEpoch + '/' + epochs + ' — loss: ' + (lossHistory[lossHistory.length - 1]?.loss || 0).toFixed(6);
+
+            if (currentEpoch < epochs) {
+                setTimeout(trainChunk, 10);
+            } else {
+                var totalTime = ((Date.now() - trainStart) / 1000).toFixed(1);
+                document.getElementById('trainTimer').textContent = 'готово (' + totalTime + ' с)';
+                document.getElementById('trainStat').textContent =
+                    'Завершено! Эпох: ' + epochs + ', финальный loss: ' + lossHistory[lossHistory.length - 1].loss.toFixed(6) + ', время: ' + totalTime + ' с';
+                document.getElementById('testPanel').style.display = '';
+                document.getElementById('btnTrain').disabled = false;
+                nn.save('direct_ballistics');
+                drawLossChart();
+            }
+        }
+
+        setTimeout(trainChunk, 50);
+    }
+
+    function drawLossChart() {
+        var canvas = document.getElementById('lossCanvas');
+        var ctx = canvas.getContext('2d');
+        var w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        if (lossHistory.length < 2) return;
+
+        var maxLoss = lossHistory[0].loss;
+        var minLoss = lossHistory[lossHistory.length - 1].loss;
+        var range = maxLoss - minLoss || 1;
+
+        ctx.strokeStyle = '#f0b24f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (var i = 0; i < lossHistory.length; i++) {
+            var x = (i / (lossHistory.length - 1)) * (w - 20) + 10;
+            var y = h - 10 - ((lossHistory[i].loss - minLoss) / range) * (h - 30);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = '#889'; ctx.font = '10px monospace';
+        ctx.fillText('Loss: ' + maxLoss.toFixed(4), 10, 14);
+        ctx.fillText(minLoss.toFixed(6), 10, h - 4);
+    }
+
+    document.getElementById('btnTest').addEventListener('click', runTest);
+    document.getElementById('btnTop5').addEventListener('click', runTop5);
+
+    function runTest() {
+        if (!nn || !normData) return;
+        var table = document.getElementById('testTable');
+        var rows = [];
+        var totalErr = 0;
+        var count = Math.min(100, dataset.length);
+
+        for (var i = 0; i < count; i++) {
+            var idx = Math.floor(Math.random() * dataset.length);
+            var s = dataset[idx];
+            var inp = normData.inputs[idx];
+            var pred = nn.predict(inp);
+            var denorm = BallisticsNN.denormalize(pred, normData.mins, normData.maxs);
+            var predRange = denorm[0];
+            var err = Math.abs(predRange - s.range) / Math.max(1, s.range) * 100;
+            totalErr += err;
+            rows.push({s:s, predRange:Math.round(predRange), err:err});
+        }
+        rows.sort(function(a,b) { return a.err - b.err; });
+        var html = '<tr><th>#</th><th>V₀</th><th>Угол</th><th>Дальность (сим)</th><th>Дальность (сеть)</th><th>Ошибка %</th></tr>';
+        rows.forEach(function(r, i) {
+            html += '<tr><td>'+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td>'+
+                '<td class="val">'+r.s.range+'</td><td class="val">'+r.predRange+'</td>'+
+                '<td class="'+(r.err<5?'good':'err')+'">'+r.err.toFixed(1)+'%</td></tr>';
+        });
+        var avgErr = totalErr / count;
+        html += '<tr><td colspan="3"><b>Средняя ошибка ('+count+' тестов)</b></td><td colspan="3" class="'+(avgErr<5?'good':'err')+'"><b>'+avgErr.toFixed(1)+'%</b></td></tr>';
+        table.innerHTML = html;
+        document.getElementById('top5block').innerHTML = '';
+    }
+
+    function runTop5() {
+        if (!nn || !normData) return;
+        var rows = [];
+        for (var i = 0; i < 200; i++) {
+            var idx = Math.floor(Math.random() * dataset.length);
+            var s = dataset[idx];
+            var inp = normData.inputs[idx];
+            var pred = nn.predict(inp);
+            var denorm = BallisticsNN.denormalize(pred, normData.mins, normData.maxs);
+            var predRange = denorm[0];
+            var err = Math.abs(predRange - s.range) / Math.max(1, s.range) * 100;
+            rows.push({s:s, predRange:Math.round(predRange), err:err});
+        }
+        rows.sort(function(a,b) { return a.err - b.err; });
+        var top5 = rows.slice(0, 5);
+        var html = '<h3 style="color:#4ecb71;margin-top:8px">Топ-5 совпадений нейросеть ↔ симулятор</h3>';
+        html += '<table class="compare-table"><tr style="background:rgba(78,203,113,0.1)"><th>#</th><th>V₀</th><th>Угол</th><th>h₀</th><th>Азимут</th><th>Дальность (сим)</th><th>Дальность (сеть)</th><th>Ошибка</th></tr>';
+        top5.forEach(function(r, i) {
+            html += '<tr style="background:rgba(78,203,113,'+(0.08-i*0.012)+')">'+
+                '<td class="good">★ '+(i+1)+'</td><td>'+r.s.v0+'</td><td>'+r.s.angle+'</td><td>'+r.s.h0+'</td><td>'+r.s.azimuth+'</td>'+
+                '<td class="val">'+r.s.range+'</td><td class="val">'+r.predRange+'</td>'+
+                '<td class="good"><b>'+r.err.toFixed(2)+'%</b></td></tr>';
+        });
+        var avgTop = top5.reduce(function(s,r){return s+r.err;},0)/5;
+        html += '<tr><td colspan="5"><b>Средняя ошибка топ-5</b></td><td colspan="3" class="good"><b>'+avgTop.toFixed(2)+'%</b></td></tr>';
+        html += '</table>';
+        document.getElementById('top5block').innerHTML = html;
+        savedTop5 = top5;
+    }
+
+    function saveTop5() {
+        if (!savedTop5 || savedTop5.length === 0) {
+            alert('Сначала нажмите «Топ-5 совпадений»');
+            return;
+        }
+        var data = savedTop5.map(function(r) {
+            return {v0:r.s.v0, angle:r.s.angle, h0:r.s.h0, azimuth:r.s.azimuth,
+                rangeSim:r.s.range, rangeNN:r.predRange, err:r.err.toFixed(2)};
+        });
+        localStorage.setItem('nn_top5_results', JSON.stringify(data));
+        document.getElementById('top5block').innerHTML += '<div style="color:#5bc8f0;font-size:11px;margin-top:4px">✓ Сохранено в localStorage</div>';
+    }
+
+    function loadTop5() {
+        var raw = localStorage.getItem('nn_top5_results');
+        if (!raw) { document.getElementById('top5block').innerHTML = '<div style="color:#889">Нет сохранённых результатов</div>'; return; }
+        var data = JSON.parse(raw);
+        var html = '<h3 style="color:#f0b24f;margin-top:8px">Сохранённые топ-5</h3>';
+        html += '<table class="compare-table"><tr style="background:rgba(240,178,79,0.1)"><th>#</th><th>V₀</th><th>Угол</th><th>h₀</th><th>Азимут</th><th>Дальность (сим)</th><th>Дальность (сеть)</th><th>Ошибка</th></tr>';
+        data.forEach(function(r, i) {
+            html += '<tr style="background:rgba(240,178,79,'+(0.08-i*0.012)+')">'+
+                '<td>★ '+(i+1)+'</td><td>'+r.v0+'</td><td>'+r.angle+'</td><td>'+r.h0+'</td><td>'+r.azimuth+'</td>'+
+                '<td class="val">'+r.rangeSim+'</td><td class="val">'+r.rangeNN+'</td>'+
+                '<td><b>'+r.err+'%</b></td></tr>';
+        });
+        html += '</table>';
+        document.getElementById('top5block').innerHTML = html;
+    }
+
+    document.getElementById('btnSaveTop5').addEventListener('click', saveTop5);
+    document.getElementById('btnLoadTop5').addEventListener('click', loadTop5);
+
+    // Try to load saved model
+    var saved = NeuralNetwork.load('direct_ballistics');
+    if (saved) {
+        nn = saved;
+        document.getElementById('trainPanel').style.display = '';
+        document.getElementById('testPanel').style.display = '';
+        document.getElementById('trainStat').textContent = 'Загружена сохранённая модель (слои: ' + nn.layers.join('→') + ')';
+    }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1319 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica / Tactica</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
+        #sceneCanvas { display: block; width: 100vw; height: 100vh; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: linear-gradient(180deg,rgba(11,14,16,0.95) 0%,rgba(11,14,16,0.7) 80%,transparent); pointer-events: auto; }
+        .topbar h1 { font-size: 18px; font-weight: 700; color: #f0b24f; margin: 0; }
+        .panel { position: fixed; top: 108px; left: 14px; z-index: 10; background: rgba(17,22,27,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; width: 240px; }
+        .env-panel { position: fixed; top: 108px; left: 270px; z-index: 10; background: rgba(17,22,27,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; width: 180px; }
+        .env-panel h2 { font-size: 12px; font-weight: 600; color: #96a8b6; margin: 0 0 6px; }
+        .env-panel label { font-size: 10px; color: #889; display: flex; flex-direction: column; gap: 1px; margin-bottom: 3px; }
+        .env-panel input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 3px; color: #ccc; padding: 2px 4px; font: 500 10px/1.3 inherit; }
+        .env-panel button { display: block; width: 100%; margin-top: 4px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.10); border-radius: 4px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 10px/1.3 inherit; }
+        .env-panel button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
+        .panel h2 { font-size: 12px; font-weight: 600; color: #96a8b6; margin: 0 0 8px; }
+        .panel button { display: block; width: 100%; margin-bottom: 4px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 5px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 11px/1.3 inherit; transition: all 0.15s; text-align: left; }
+        .panel button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
+        .panel button.active { background: rgba(240,178,79,0.15); border-color: #f0b24f; color: #f0b24f; }
+        .panel .file-btn { color: #667; }
+        .panel .info { font-size: 10px; color: #889; margin-top: 6px; }
+        .panel .info span { color: #aab; }
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+        .control-grid label { font-size: 10px; color: #889; }
+        .control-grid input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 3px; color: #ccc; padding: 2px 4px; font: 500 10px/1.3 inherit; margin-top: 3px; }
+        .button-row { display: flex; gap: 4px; margin-top: 6px; }
+        .button-row .primary { background: rgba(240,178,79,0.15); border-color: #f0b24f; color: #f0b24f; }
+        .button-row button { padding: 4px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 5px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 11px/1.3 inherit; }
+        .button-row button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
+        .segmented { display: flex; gap: 2px; margin-top: 9px; }
+        .segmented button { padding: 3px 8px; border: 1px solid rgba(255,255,255,0.10); border-radius: 4px; background: rgba(255,255,255,0.04); color: #889; cursor: pointer; font: 500 10px/1.3 inherit; }
+        .segmented button.active { background: rgba(240,178,79,0.15); border-color: #f0b24f; color: #f0b24f; }
+        .segmented button:hover { border-color: rgba(255,255,255,0.22); color: #ccc; }
+        .launch-bar { position: fixed; top: 52px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(11,14,16,0.92); border-bottom: 1px solid rgba(255,255,255,0.06); flex-wrap: nowrap; overflow-x: auto; }
+        .launch-bar label { font-size: 10px; color: #889; display: flex; flex-direction: column; gap: 1px; }
+        .launch-bar input, .launch-bar select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 3px; color: #ccc; padding: 2px 4px; font: 500 10px/1.3 inherit; }
+        .launch-bar select { width: 194px; }
+        .launch-bar input { width: 58px; height: 20px; box-sizing: border-box; }
+        .hud-item { font-size: 15px; color: var(--text,#c8cdd0); font-weight: 400; white-space: nowrap; background: rgba(10,12,15,0.65); padding: 0 8px; border-radius: 999px; border: 1px solid var(--line,rgba(255,255,255,0.1)); width: 188px; height: 20px; display: inline-flex; align-items: center; align-self: flex-end; text-shadow: none; }
+        .launch-bar button { padding: 3px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 5px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 10px/1.3 inherit; white-space: nowrap; }
+        .launch-bar button.primary { background: rgba(240,178,79,0.15); border-color: #f0b24f; color: #f0b24f; }
+        .launch-bar button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
+        .orient-panel { position: fixed; top: auto; left: auto; z-index: 10; background: rgba(17,22,27,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; }
+        .orient-panel h2 { font-size: 12px; font-weight: 600; color: #96a8b6; margin: 0 0 6px; }
+        .orient-panel button { padding: 4px 14px; border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; background: rgba(10,12,15,0.65); color: #c8cdd0; cursor: pointer; font: 600 11px/1.3 inherit; }
+        .orient-panel button:hover { border-color: rgba(78,203,113,0.6); box-shadow: 0 0 10px rgba(78,203,113,0.25); }
+        .orient-panel button.primary { background: rgba(78,203,113,0.2); border-color: #4ecb71; color: #4ecb71; font-weight: 700; padding: 6px 22px; font-size: 13px; text-shadow: 0 0 10px rgba(78,203,113,0.5); }
+        .orient-panel button.primary.running { background: rgba(242,95,92,0.25); border-color: #f25f5c; color: #f25f5c; text-shadow: 0 0 10px rgba(242,95,92,0.5); }
+        .orient-panel button.primary.running:hover { box-shadow: 0 0 14px rgba(242,95,92,0.3); }
+        #compassInc, #compassDec { color: #c8cdd0; border: none; background: transparent; font-size: 16px; padding: 0 4px; cursor: pointer; }
+        #compassInc:hover, #compassDec:hover { color: #f0b24f; }
+        .legend { position: fixed; bottom: 16px; left: 14px; z-index: 10; display: flex; gap: 12px; }
+        .legend span { font-size: 10px; color: #778; display: flex; align-items: center; gap: 4px; }
+        .legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
+        .height-label { position: fixed; bottom: 16px; right: 20px; z-index: 10; font-size: 14px; font-weight: 700; color: #f0b24f; background: rgba(17,22,27,0.85); padding: 4px 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <canvas id="sceneCanvas"></canvas>
+
+    <div class="topbar">
+        <div>
+            <h1>Ballistica / Tactica</h1>
+        </div>
+        <div class="top-actions">
+            <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
+            <div class="status-pill" id="runState">Готово</div>
+            <a class="top-link" href="tactica.html">Tactica</a>
+            <a class="top-link" href="network.html">Сеть</a>
+            <a class="top-link" href="training.html">Обучение</a>
+            <a class="top-link" href="nn-train.html">Тренировка</a>
+        </div>
+    </div>
+
+    <div class="launch-bar">
+        <select id="preset">
+            <option value="shell152Of540Like">152 мм ОФ, учебный</option>
+            <option value="mortar120Like">120 мм мина, учебный</option>
+            <option value="vacuumCheck">Вакуумная проверка</option>
+        </select>
+        <span style="width:34px;flex-shrink:0"></span>
+        <label>V₀<input id="v0" type="number" value="655"></label>
+        <label>Угол<input id="angle" type="number" value="45"></label>
+        <label>Азимут<input id="azimuth" type="number" value="45"></label>
+        <label>h₀<input id="h0" type="number" value="0"></label>
+        <label>RK4<input id="dt" type="number" value="0.02" style="width:50px"></label>
+        <label>Лимит<input id="maxTime" type="number" value="300" style="width:50px"></label>
+        <span style="width:34px;flex-shrink:0"></span>
+        <span id="hudRange" class="hud-item">Дальность —</span>
+        <span style="width:34px;flex-shrink:0"></span>
+        <span id="hudAltitude" class="hud-item">Высота —</span>
+        <span style="width:34px;flex-shrink:0"></span>
+        <span id="hudSpeed" class="hud-item">Скорость —</span>
+        <span style="width:34px;flex-shrink:0"></span>
+        <span id="hudTime" class="hud-item">Время —</span>
+    </div>
+
+    <div class="orient-panel" id="orientPanel">
+        <h2>Ориентация</h2>
+        <div style="display:flex;align-items:center;gap:10px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="display:flex;gap:8px">
+                    <button id="compassDec" style="width:28px;height:28px;padding:0;font-size:14px;line-height:1">◀</button>
+                    <button id="compassInc" style="width:28px;height:28px;padding:0;font-size:14px;line-height:1">▶</button>
+                </div>
+                <div id="compass" style="width:80px;height:80px;position:relative;cursor:pointer;flex-shrink:0">
+                    <canvas id="compassCanvas" width="80" height="80" style="display:block;border-radius:50%"></canvas>
+                </div>
+                <div id="compassVal" style="font-size:13px;color:#f0b24f;font-weight:700;text-align:center;min-width:60px">45°</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+                <button id="launchBtn" class="primary" title="Запустить / остановить симуляцию полёта снаряда">Старт</button>
+                <button id="pauseBtnB" title="Приостановить / возобновить полёт">Пауза</button>
+                <button id="resetShotBtnB" title="Сбросить полёт и очистить историю траекторий">Сброс</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="orient-panel" id="targetLib" style="top:auto;left:auto">
+        <h2>Библиотека целей</h2>
+        <div style="display:flex;gap:8px">
+            <div class="target-card" data-target="factory" style="cursor:pointer;border:2px solid transparent;border-radius:6px;padding:4px;text-align:center">
+                <canvas id="thumbFactory" width="80" height="60" style="display:block;border-radius:4px;background:#1a1d22"></canvas>
+                <span style="font-size:10px;color:#889">Завод</span>
+            </div>
+            <div class="target-card" data-target="vehicle" style="cursor:pointer;border:2px solid transparent;border-radius:6px;padding:4px;text-align:center">
+                <canvas id="thumbVehicle" width="80" height="60" style="display:block;border-radius:4px;background:#1a1d22"></canvas>
+                <span style="font-size:10px;color:#889">Техника</span>
+            </div>
+            <div class="target-card" data-target="msta" style="cursor:pointer;border:2px solid transparent;border-radius:6px;padding:4px;text-align:center">
+                <img src="Models/MSTA-S/мста_2.jpg" width="80" height="60" style="display:block;border-radius:4px;object-fit:cover">
+                <span style="font-size:10px;color:#889">2С19 Мста</span>
+            </div>
+        </div>
+        <div style="font-size:9px;color:#667;margin-top:4px">ПКМ по рельефу — установить</div>
+    </div>
+
+    <div class="orient-panel" id="simPanel" style="top:auto;left:auto;min-width:220px">
+        <h2>Симуляция обучения</h2>
+        <div style="display:flex;gap:4px;margin-bottom:4px">
+            <button id="btnModeGun" style="background:rgba(78,203,113,0.2);border-color:#4ecb71;color:#4ecb71;font-size:10px;padding:3px 8px">Орудие</button>
+            <button id="btnModeTarget" style="font-size:10px;padding:3px 8px">Цель</button>
+        </div>
+        <div id="simList" style="font-size:14px;color:#889;max-height:160px;overflow-y:auto;margin-bottom:6px">Нет данных</div>
+        <div class="button-row">
+            <button id="btnSimPlay" style="background:rgba(78,203,113,0.2);border-color:#4ecb71;color:#4ecb71">▶ Старт</button>
+            <button id="btnSimClear">Очистить</button>
+        </div>
+        <div style="font-size:9px;color:#667;margin-top:2px" id="simStatus"></div>
+    </div>
+
+    <div class="env-panel" id="envPanel">
+        <h2>Среда</h2>
+        <input id="windX" type="hidden" value="0">
+        <input id="windY" type="hidden" value="0">
+        <input id="windZ" type="hidden" value="0">
+        <input id="windDir" type="hidden" value="0">
+        <div id="windCompass" style="width:80px;height:80px;position:relative;cursor:pointer;margin:0 auto 4px">
+            <canvas id="windCompassCanvas" width="80" height="80" style="display:block;border-radius:50%"></canvas>
+            <div id="windCompassVal" style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);font-size:9px;color:#f0b24f;font-weight:600">0°</div>
+        </div>
+        <label>Сила (м/с)<input id="windSpeed" type="number" value="0"></label>
+        <label>Напр-е (°)<input id="windDirInput" type="number" value="0"></label>
+        <label>Турб-ть<input id="turbulence" type="number" value="0"></label>
+    </div>
+
+    <div class="env-panel" id="targetPanel" style="top:260px">
+        <h2>Цель</h2>
+        <label>Цель (м)<input id="targetRange" type="number" value="15000"></label>
+        <button id="findAngleBtn" title="Подобрать угол для попадания в цель на заданной дальности">Найти угол</button>
+        <button id="snapTargetBtn" title="Установить дальность цели по текущему прогнозу попадания">Цель = прогноз</button>
+    </div>
+
+    <div class="panel" id="draggablePanel">
+        <h2>Ландшафт</h2>
+        <div class="button-row">
+            <button id="btnLoad" title="Загрузить файл рельефа (OBJ/FBX)">Загрузить</button>
+            <button id="btnReset" title="Убрать рельеф со сцены">Сброс</button>
+        </div>
+        <div class="info" style="margin-bottom:4px">Файл: <span id="fileName">—</span></div>
+        <label style="font-size:10px;color:#889">Масштаб (1 ед = <input id="terrainScaleInput" type="number" value="7" min="0.01" max="100" step="0.1" style="width:50px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#ccc;padding:1px 3px"> ×5000м)</label>
+        <button id="btnApplyScale" style="margin-left:4px;padding:2px 8px;font-size:10px" title="Применить масштаб (1 единица OBJ = N × 5000 метров)">OK</button>
+        <input type="file" id="terrainFile" accept=".obj,.fbx" style="display:none">
+    </div>
+
+    <div class="panel mass-panel" style="top:340px">
+        <h2>Масса / Cd</h2>
+        <div class="control-grid">
+            <label>Масса (кг)<input id="mass" type="number" value="43.5" min="0.1" max="2000" step="0.1"></label>
+            <label>Форм-фактор<input id="formFactor" type="number" value="0.92" min="0" max="3" step="0.05"></label>
+            <label>Постоянный Cd<input id="cdConst" type="number" value="0.25" min="0" max="2" step="0.01"></label>
+        </div>
+        <div class="segmented" id="cdModelGroup" role="radiogroup" style="display:flex;gap:2px">
+            <button type="button" data-cd-model="machTable" class="active" title="Коэффициент сопротивления по таблице Mach">Mach-таблица</button>
+            <button type="button" data-cd-model="constant" title="Постоянный коэффициент сопротивления">Cd const</button>
+            <button type="button" data-cd-model="none" title="Без сопротивления воздуха (вакуум)">Без воздуха</button>
+        </div>
+    </div>
+
+    <div class="legend" style="display:none"></div>
+
+    <div class="height-label" id="heightLabel" style="display:none">0 м</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script src="physics.js"></script>
+    <script src="terrain.js"></script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        (function () {
+            const canvas = document.getElementById('sceneCanvas');
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setClearColor(0x1a1d22, 1);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(48, 1, 0.5, 200000);
+            camera.position.set(-8000, 8000, -5000);
+            camera.lookAt(7500, 0, 7500);
+
+            const ambient = new THREE.AmbientLight(0x202030, 0.15);
+            const hemi = new THREE.HemisphereLight(0xc8c0e0, 0x101820, 0.3);
+            const sun = new THREE.DirectionalLight(0xffc080, 3.0);
+            sun.position.set(-550, 180, -150);
+            scene.add(ambient, hemi, sun);
+
+            const grid = new THREE.GridHelper(300, 30, 0x3e4b54, 0x273139);
+            grid.position.y = 0;
+            grid.visible = false; // скрыт — текстура показывает рельеф
+            scene.add(grid);
+
+            let terrainMesh = null;
+            const raycaster = new THREE.Raycaster();
+            raycaster.far = 5000;
+
+            // ── Симуляция баллистики ──────────────────────────────────────────
+            let heightGrid = null;       // { data, size, worldSize, half, scale }
+            let trajectoryLine = null;
+            let previewLine = null;
+            let trajectoryHistory = [];
+            let targetMarker = null;
+            let projectileDot = null;
+            let gunMarker = null;
+            let gunRing = null;
+            let impactLabel = null;
+            let shotCounter = 0;
+            let targetModels = [];
+            let selectedTarget = null;
+            let shot = null;
+            let shotRunning = false;
+            let shotPaused = false;
+            let shotTime = 0;
+            const DT_SIM = 0.02;
+            let terrainScale = 1.0;
+            const gunOffset = { x: 353, z: 353 }; // 500m diagonal at 45°
+
+            function buildHeightGrid(mesh) {
+                const gridSize = 512;
+                mesh.updateMatrixWorld();
+                const box = new THREE.Box3().setFromObject(mesh);
+                const worldSize = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+                if (worldSize < 1) { console.warn('Height grid: terrain too small', worldSize); return; }
+                const data = new Float32Array(gridSize * gridSize).fill(-9999);
+
+                mesh.traverse(function(child) {
+                    if (!child.isMesh || !child.geometry.attributes.position) return;
+                    const pos = child.geometry.attributes.position;
+                    const wp = new THREE.Vector3();
+                    child.updateWorldMatrix(true, false);
+                    for (let i = 0; i < pos.count; i++) {
+                        wp.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+                        const gx = Math.round((wp.x - box.min.x) / worldSize * (gridSize - 1));
+                        const gy = Math.round((wp.z - box.min.z) / worldSize * (gridSize - 1));
+                        if (gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize) {
+                            const idx = gy * gridSize + gx;
+                            if (wp.y > data[idx]) data[idx] = wp.y;
+                        }
+                    }
+                });
+                // Fill holes
+                for (let y = 1; y < gridSize - 1; y++) {
+                    for (let x = 1; x < gridSize - 1; x++) {
+                        const idx = y * gridSize + x;
+                        if (data[idx] === -9999) {
+                            let sum = 0, cnt = 0;
+                            for (let dy = -1; dy <= 1; dy++)
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const v = data[(y+dy)*gridSize + (x+dx)];
+                                    if (v !== -9999) { sum += v; cnt++; }
+                                }
+                            if (cnt > 0) data[idx] = sum / cnt;
+                        }
+                    }
+                }
+                heightGrid = { data, size: gridSize, worldSize, minX: box.min.x, minZ: box.min.z };
+                console.log('Height grid:', gridSize + 'x' + gridSize, 'world', worldSize.toFixed(0) + 'm',
+                    'range', box.min.x.toFixed(0) + '-' + box.max.x.toFixed(0),
+                    box.min.z.toFixed(0) + '-' + box.max.z.toFixed(0));
+            }
+
+            function getTerrainH(wx, wz) {
+                if (!heightGrid) return 0;
+                const worldSize = heightGrid.worldSize;
+                const size = heightGrid.size;
+                const fx = Math.max(0, Math.min(size - 1, (wx - heightGrid.minX) / worldSize * (size - 1)));
+                const fy = Math.max(0, Math.min(size - 1, (wz - heightGrid.minZ) / worldSize * (size - 1)));
+                const x0 = Math.max(0, Math.min(size - 2, Math.floor(fx)));
+                const y0 = Math.max(0, Math.min(size - 2, Math.floor(fy)));
+                const tx = fx - x0, ty = fy - y0;
+                const a = heightGrid.data[y0 * size + x0];
+                const b = heightGrid.data[y0 * size + x0 + 1];
+                const c = heightGrid.data[(y0 + 1) * size + x0];
+                const d = heightGrid.data[(y0 + 1) * size + x0 + 1];
+                const vals = [a, b, c, d].filter(function(v) { return v !== -9999; });
+                if (vals.length === 0) return 0;
+                return vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
+            }
+
+            // Override physics.js landing
+            window._terrainHeightFn = function(x, z) { return getTerrainH(x, z); };
+
+            function createTrajectoryLine() {
+                trajectoryLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2.2 }));
+                previewLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xf0b24f, linewidth: 2.5 }));
+                scene.add(trajectoryLine);
+                scene.add(previewLine);
+                targetMarker = new THREE.Group();
+                const tRing = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.18, 8, 42), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
+                tRing.rotation.x = Math.PI / 2;
+                const tPost = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 9, 10), new THREE.MeshBasicMaterial({ color: 0xf25f5c }));
+                tPost.position.y = 4.5;
+                targetMarker.add(tRing, tPost);
+                scene.add(targetMarker);
+                // Gun position marker
+                gunMarker = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 12), new THREE.MeshBasicMaterial({ color: 0x4cc9a4 }));
+                gunMarker.position.set(gunOffset.x, getTerrainH(gunOffset.x, gunOffset.z), gunOffset.z);
+                scene.add(gunMarker);
+                // Red glowing ring 500m diameter
+                gunRing = new THREE.Group();
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0x0033aa, transparent: true, opacity: 0.9 });
+                const glowMat = new THREE.MeshBasicMaterial({ color: 0x0044cc, transparent: true, opacity: 0.25 });
+                const mainRing = new THREE.Mesh(new THREE.TorusGeometry(500, 3, 16, 100), ringMat);
+                mainRing.rotation.x = Math.PI / 2;
+                const glowRing = new THREE.Mesh(new THREE.TorusGeometry(500, 8, 16, 100), glowMat);
+                glowRing.rotation.x = Math.PI / 2;
+                gunRing.add(glowRing, mainRing);
+                gunRing.position.copy(gunMarker.position);
+                scene.add(gunRing);
+                // 3D projectile model
+                projectileDot = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 4.2, 24), new THREE.MeshStandardMaterial({ color: 0xd7dde0, roughness: 0.48, metalness: 0.25 }));
+                body.rotation.z = Math.PI / 2;
+                const tailCap = new THREE.Mesh(new THREE.SphereGeometry(1.15, 20, 12), new THREE.MeshStandardMaterial({ color: 0xd7dde0, roughness: 0.48, metalness: 0.25 }));
+                tailCap.position.x = -2.1;
+                const nose = new THREE.Mesh(new THREE.ConeGeometry(1.4, 2.1, 24), new THREE.MeshStandardMaterial({ color: 0xf0b24f, roughness: 0.42, metalness: 0.2 }));
+                nose.rotation.z = -Math.PI / 2;
+                nose.position.x = 3.15;
+                projectileDot.add(body, tailCap, nose);
+                projectileDot.visible = false;
+                scene.add(projectileDot);
+            }
+
+            function rebuildPreview() {
+                const v0 = Number(document.getElementById('v0').value) || 655;
+                const angle = Number(document.getElementById('angle').value) || 45;
+                const h0 = Math.max(10, Number(document.getElementById('h0').value) || 0);
+                const azimuth = Number(document.getElementById('azimuth').value) || 0;
+                const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
+                const mass = Number(document.getElementById('mass').value) || 43.5;
+                const formFactor = Number(document.getElementById('formFactor').value) || 0.92;
+                const cdConst = Number(document.getElementById('cdConst').value) || 0.25;
+                const windX = Number(document.getElementById('windX').value) || 0;
+                const windY = Number(document.getElementById('windY').value) || 0;
+                const windZ = Number(document.getElementById('windZ').value) || 0;
+                const p = { v0, angle, h0, azimuth, mass, formFactor, cdConst, cdModel, maxTime: 300, dt: 0.02, windX, windY, windZ, turbulence: 0, turbulenceScale: 500, densityScale: 1 };
+                try {
+                    const airShot = new Projectile(v0, angle, h0, azimuth, p);
+                    airShot.run(p.maxTime, p.dt);
+                    if (previewLine) {
+                        const pts = airShot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z));
+                        previewLine.geometry.dispose();
+                        previewLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+                    }
+                    // Save to history
+                    const histGeo = new THREE.BufferGeometry().setFromPoints(airShot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z)));
+                    const alpha = 0.3 + (trajectoryHistory.length % 10) * 0.05;
+                    const histLine = new THREE.Line(histGeo, new THREE.LineBasicMaterial({ color: 0xf0b24f, transparent: true, opacity: alpha }));
+                    trajectoryHistory.push(histLine);
+                    scene.add(histLine);
+                    // Vacuum trajectory — not rendered
+                    const vacHit = analyticVacuumImpact(v0, angle, h0);
+                    // Target marker at predicted impact
+                    if (targetMarker && airShot.trail.length > 0) {
+                        const imp = airShot.trail[airShot.trail.length - 1];
+                        targetMarker.position.set(imp.x + gunOffset.x, imp.y, imp.z + gunOffset.z);
+                        targetMarker.visible = true;
+                    }
+                } catch(err) {
+                    console.error('Preview error:', err);
+                }
+            }
+
+            function launchShot() {
+                if (shotRunning && !shotPaused) { resetShot(); return; }
+                if (shotPaused) { shotPaused = false; document.getElementById('runState').textContent = 'Полет'; return; }
+                const v0 = Number(document.getElementById('v0').value) || 655;
+                const angle = Number(document.getElementById('angle').value) || 45;
+                const h0 = Number(document.getElementById('h0').value) || 0;
+                const groundH = getTerrainH(gunOffset.x, gunOffset.z);
+                const effectiveH0 = h0; // h0 is absolute, use terrain height from input
+                const azimuth = Number(document.getElementById('azimuth').value) || 0;
+                const windX = Number(document.getElementById('windX').value) || 0;
+                const windY = Number(document.getElementById('windY').value) || 0;
+                const windZ = Number(document.getElementById('windZ').value) || 0;
+                const turbulence = Number(document.getElementById('turbulence').value) || 0;
+                const mass = Number(document.getElementById('mass').value) || 43.5;
+                const formFactor = Number(document.getElementById('formFactor').value) || 0.92;
+                const cdConst = Number(document.getElementById('cdConst').value) || 0.25;
+                const cdModel = document.querySelector('#cdModelGroup button.active')?.dataset.cdModel || 'machTable';
+                const dt = Number(document.getElementById('dt').value) || 0.02;
+                const maxTime = Number(document.getElementById('maxTime').value) || 300;
+                const densityScale = 1.0;
+                const turbulenceScale = 500;
+                Object.assign(params, { v0, angle, h0: effectiveH0, azimuth, windX, windY, windZ, turbulence, turbulenceScale, densityScale, mass, formFactor, cdConst, cdModel, dt, maxTime });
+                shot = new Projectile(v0, angle, effectiveH0, azimuth, params);
+                console.log('Launch:', v0, angle, effectiveH0, azimuth, 'trail start:', shot.trail.length);
+                shotRunning = true;
+                shotPaused = false;
+                shotTime = 0;
+                shotCounter++;
+                if (impactLabel) { scene.remove(impactLabel); impactLabel = null; }
+                document.getElementById('runState').textContent = 'Полет';
+                document.getElementById('launchBtn').classList.add('running');
+                document.getElementById('launchBtn').textContent = 'Стоп';
+                targetMarker.visible = false;
+                if (previewLine) previewLine.geometry.setFromPoints([]);
+                if (trajectoryLine) trajectoryLine.geometry.setFromPoints([]);
+            }
+
+            function resetShot() {
+                shotRunning = false;
+                shotPaused = false;
+                shot = null;
+                shotTime = 0;
+                shotCounter = 0;
+                document.getElementById('runState').textContent = 'Готово';
+                document.getElementById('launchBtn').classList.remove('running');
+                document.getElementById('launchBtn').textContent = 'Старт';
+                if (trajectoryLine) trajectoryLine.geometry.setFromPoints([]);
+                if (projectileDot) projectileDot.visible = false;
+                if (impactLabel) { scene.remove(impactLabel); impactLabel = null; }
+                // Clear history
+                trajectoryHistory.forEach(function(l) { scene.remove(l); });
+                trajectoryHistory = [];
+                rebuildPreview();
+            }
+
+            function togglePause() {
+                if (!shot || shot.landed) return;
+                shotPaused = !shotPaused;
+                document.getElementById('runState').textContent = shotPaused ? 'Пауза' : 'Полет';
+            }
+
+            function applyPreset(key) {
+                const preset = PROJECTILE_PRESETS[key];
+                if (!preset) return;
+                Object.assign(params, { preset: key, ...preset.params });
+                document.getElementById('v0').value = params.v0;
+                document.getElementById('angle').value = params.angle;
+                document.getElementById('mass').value = params.mass;
+                document.getElementById('formFactor').value = params.formFactor;
+                document.getElementById('cdConst').value = params.cdConst || 0.25;
+                document.getElementById('h0').value = params.h0;
+                document.getElementById('azimuth').value = params.azimuth;
+                rebuildPreview();
+            }
+
+            function findAngleForTarget() {
+                const targetRange = Number(document.getElementById('targetRange').value) || 15000;
+                const v0 = Number(document.getElementById('v0').value) || 655;
+                const h0 = Number(document.getElementById('h0').value) || 0;
+                let bestAngle = 45, bestDiff = Infinity;
+                for (let a = 5; a <= 85; a += 0.5) {
+                    const p = { ...params, angle: a, h0, v0 };
+                    const s = new Projectile(v0, a, h0, params.azimuth || 0, p);
+                    s.run(p.maxTime || 300, p.dt || 0.02);
+                    const diff = Math.abs(s.getHorizontalRange() - targetRange);
+                    if (diff < bestDiff) { bestDiff = diff; bestAngle = a; }
+                }
+                document.getElementById('angle').value = Math.round(bestAngle * 10) / 10;
+                rebuildPreview();
+            }
+
+            function setTargetToPrediction() {
+                const v0 = Number(document.getElementById('v0').value) || 655;
+                const angle = Number(document.getElementById('angle').value) || 45;
+                const h0 = Number(document.getElementById('h0').value) || 0;
+                const p = { ...params, angle, h0, v0 };
+                const s = new Projectile(v0, angle, h0, params.azimuth || 0, p);
+                s.run(p.maxTime || 300, p.dt || 0.02);
+                document.getElementById('targetRange').value = Math.round(s.getHorizontalRange());
+                rebuildPreview();
+            }
+
+            function updateShot(dt) {
+                if (!shotRunning || !shot || shot.landed || shotPaused) return;
+                const steps = Math.ceil(dt / DT_SIM);
+                for (let i = 0; i < steps && !shot.landed; i++) {
+                    shot.step(DT_SIM);
+                    shotTime += DT_SIM;
+                }
+                // Update trajectory line
+                if (shot.trail.length >= 2 && trajectoryLine) {
+                    const pts = shot.trail.map(p => new THREE.Vector3(p.x + gunOffset.x, p.y, p.z + gunOffset.z));
+                    trajectoryLine.geometry.dispose();
+                    trajectoryLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+                }
+                // Update projectile dot
+                if (projectileDot && shot.trail.length > 0) {
+                    const p = shot.trail[shot.trail.length - 1];
+                    projectileDot.position.set(p.x + gunOffset.x, p.y, p.z + gunOffset.z);
+                    projectileDot.visible = true;
+                    if (shot.vx !== undefined) {
+                        const dir = new THREE.Vector3(shot.vx, shot.vy, shot.vz).normalize();
+                        projectileDot.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+                    }
+                }
+                // Impact marker
+                if (shot.landed) {
+                    const p = shot.trail[shot.trail.length - 1];
+                    // Impact label flag
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256; canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = 'rgba(17,22,27,0.85)'; ctx.fillRect(0, 0, 256, 64);
+                    ctx.strokeStyle = '#f0b24f'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, 254, 62);
+                    ctx.fillStyle = '#f0b24f'; ctx.font = 'bold 16px monospace';
+                    ctx.fillText('Траектория #' + shotCounter, 10, 22);
+                    ctx.fillStyle = '#ccc'; ctx.font = '14px monospace';
+                    ctx.fillText('Дальность: ' + Math.round(shot.getHorizontalRange()) + ' м', 10, 42);
+                    ctx.fillText('Время: ' + shot.t.toFixed(1) + ' с', 10, 58);
+                    const tex = new THREE.CanvasTexture(canvas);
+                    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+                    impactLabel = new THREE.Sprite(spriteMat);
+                    impactLabel.scale.set(3000, 750, 1);
+                    impactLabel.position.set(p.x + gunOffset.x, p.y + 60, p.z + gunOffset.z);
+                    scene.add(impactLabel);
+                    shotRunning = false;
+                    document.getElementById('runState').textContent = 'Попадание';
+                    document.getElementById('launchBtn').classList.remove('running');
+                document.getElementById('launchBtn').textContent = 'Старт';
+                    setTimeout(rebuildPreview, 500);
+                }
+                // HUD
+                if (shot) {
+                    document.getElementById('hudRange').textContent = 'Дальность ' + Math.round(shot.getHorizontalRange()) + ' м';
+                    document.getElementById('hudAltitude').textContent = 'Высота ' + Math.round(Math.max(0, shot.y)) + ' м';
+                    document.getElementById('hudSpeed').textContent = 'Скорость ' + Math.round(shot.getSpeed()) + ' м/с';
+                    document.getElementById('hudTime').textContent = 'Время ' + shot.t.toFixed(1) + ' с';
+                }
+            }
+
+            const orbit = { yaw: -2.36, pitch: 0.6, distance: 20000, target: new THREE.Vector3(7500, 500, 7500), minDist: 100, maxDist: 150000 };
+            let dragState = null;
+
+            function updateCamera() {
+                const sp = orbit.distance * Math.cos(orbit.pitch);
+                camera.position.set(
+                    orbit.target.x + sp * Math.sin(orbit.yaw),
+                    orbit.target.y + orbit.distance * Math.sin(orbit.pitch),
+                    orbit.target.z + sp * Math.cos(orbit.yaw)
+                );
+                camera.lookAt(orbit.target);
+            }
+
+            function buildTerrainMesh() {
+                return null; // replaced by FBX loader
+            }
+
+            function loadOBJTerrain(path) {
+                console.log('OBJ: loading', path);
+                document.getElementById('fileName').textContent = 'Загрузка OBJ...';
+                const loader = new OBJLoader();
+                loader.load(path, function(object) {
+                    console.log('OBJ: loaded');
+                    if (terrainMesh) { scene.remove(terrainMesh); }
+                    terrainMesh = object;
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: 0x888888,
+                        roughness: 0.9,
+                        metalness: 0.05,
+                    });
+                    object.traverse(function(child) {
+                        if (child.isMesh) {
+                            child.material = mat;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    scene.add(terrainMesh);
+                    document.getElementById('fileName').textContent = path;
+                    // Scale to 5000m, shift corner to origin
+                    const rawBox = new THREE.Box3().setFromObject(terrainMesh);
+                    const rawSize = Math.max(rawBox.max.x - rawBox.min.x, rawBox.max.z - rawBox.min.z);
+                    const s = 35000 / rawSize;
+                    terrainMesh.scale.set(s, s, s);
+                    terrainMesh.updateMatrixWorld();
+                    const box2 = new THREE.Box3().setFromObject(terrainMesh);
+                    terrainMesh.position.set(-box2.min.x, 0, -box2.min.z);
+                    terrainMesh.updateMatrixWorld();
+                    console.log('Terrain scaled to 35000m, corner at origin');
+                    buildHeightGrid(terrainMesh);
+                    createTrajectoryLine();
+                    const box3 = new THREE.Box3().setFromObject(terrainMesh);
+                    const center = box3.getCenter(new THREE.Vector3());
+                    const size = box3.getSize(new THREE.Vector3());
+                    console.log('OBJ: ready, size', size.x.toFixed(0), 'x', size.z.toFixed(0));
+                    orbit.target.copy(center);
+                    orbit.distance = Math.max(size.x, size.z) * 0.7;
+                    orbit.yaw = -2.36; // угол (0,0) в правом нижнем углу экрана
+                    orbit.pitch = 0.6;
+                    orbit.minDist = orbit.distance * 0.3;
+                    orbit.maxDist = orbit.distance * 4;
+                    updateCamera();
+                    document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
+                    if (gunRing) gunRing.position.copy(gunMarker.position);
+                    rebuildPreview();
+                }, undefined, function(err) {
+                    console.error('OBJ: load error', err);
+                    document.getElementById('fileName').textContent = 'Ошибка';
+                });
+            }
+
+            function createHeightmapCanvas() {
+                const c = document.createElement('canvas');
+                c.width = 2048; c.height = 2048;
+                const ctx = c.getContext('2d');
+                const imgData = ctx.createImageData(2048, 2048);
+                const src = TerrainManager.heightData;
+                for (let i = 0; i < src.length; i++) {
+                    const v = Math.round(Math.min(1, src[i]) * 255);
+                    imgData.data[i * 4] = v;
+                    imgData.data[i * 4 + 1] = v;
+                    imgData.data[i * 4 + 2] = v;
+                    imgData.data[i * 4 + 3] = 255;
+                }
+                ctx.putImageData(imgData, 0, 0);
+                return c;
+            }
+
+            function refreshTerrain() {
+                if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
+                terrainMesh = buildTerrainMesh();
+                if (terrainMesh) {
+                    scene.add(terrainMesh);
+                    document.getElementById('heightLabel').textContent = '0 м';
+                    document.getElementById('heightLabel').style.display = 'block';
+                } else {
+                    document.getElementById('heightLabel').style.display = 'none';
+                }
+            }
+
+            function resize() {
+                const width = Math.max(1, canvas.clientWidth);
+                const height = Math.max(1, canvas.clientHeight);
+                renderer.setSize(width, height, false);
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                updateCamera();
+            }
+
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+            canvas.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                canvas.setPointerCapture(e.pointerId);
+                dragState = {
+                    mode: e.button === 1 || e.button === 2 ? 'pan' : 'orbit',
+                    x: e.clientX,
+                    y: e.clientY,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    yaw: orbit.yaw,
+                    pitch: orbit.pitch,
+                    target: orbit.target.clone()
+                };
+            });
+            canvas.addEventListener('pointermove', (e) => {
+                if (!dragState) return;
+                const dx = e.clientX - dragState.x;
+                const dy = e.clientY - dragState.y;
+
+                if (dragState.mode === 'pan') {
+                    const panScale = orbit.distance * 0.0018;
+                    const forward = new THREE.Vector3().subVectors(orbit.target, camera.position).normalize();
+                    const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+                    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+                    orbit.target.copy(dragState.target)
+                        .addScaledVector(right, -dx * panScale)
+                        .addScaledVector(up, dy * panScale);
+                } else {
+                    orbit.yaw = dragState.yaw - dx * 0.006;
+                    orbit.pitch = Math.max(-0.1, Math.min(1.15, dragState.pitch + dy * 0.004));
+                }
+                updateCamera();
+            });
+
+            canvas.addEventListener('pointerup', (e) => {
+                if (canvas.hasPointerCapture(e.pointerId)) {
+                    canvas.releasePointerCapture(e.pointerId);
+                }
+                if (dragState) {
+                    const dx = e.clientX - dragState.startX;
+                    const dy = e.clientY - dragState.startY;
+                    const moved = Math.hypot(dx, dy) > 3;
+                    if (!moved && terrainMesh) {
+                        if (e.button === 0) {
+                            if (placeMode === 'gun') placeGun(e);
+                            else if (placeMode === 'target') placeTargetClick(e);
+                        } else if (e.button === 2) {
+                            placeTargetClick(e);
+                        }
+                    }
+                }
+                dragState = null;
+            });
+            canvas.addEventListener('pointercancel', () => {
+                dragState = null;
+            });
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                orbit.distance = Math.max(orbit.minDist, Math.min(orbit.maxDist, orbit.distance * (1 + e.deltaY * 0.001)));
+                updateCamera();
+            }, { passive: false });
+            window.addEventListener('resize', resize);
+
+            document.getElementById('btnLoad').addEventListener('click', () => document.getElementById('terrainFile').click());
+            document.getElementById('btnReset').addEventListener('click', () => {
+                if (terrainMesh) { scene.remove(terrainMesh); terrainMesh = null; }
+                document.getElementById('fileName').textContent = '—';
+                heightGrid = null;
+                trajectoryHistory.forEach(function(l) { scene.remove(l); });
+                trajectoryHistory = [];
+                resetShot();
+            });
+            document.getElementById('terrainFile').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                document.getElementById('fileName').textContent = 'Загрузка...';
+                const url = URL.createObjectURL(file);
+                loadOBJTerrain(url);
+            });
+            document.getElementById('btnApplyScale').addEventListener('click', function() {
+                if (!terrainMesh || !heightGrid) return;
+                const newScale = Number(document.getElementById('terrainScaleInput').value) || 1;
+                terrainMesh.position.set(0, 0, 0);
+                terrainMesh.scale.set(1, 1, 1);
+                terrainMesh.updateMatrixWorld();
+                const rawBox = new THREE.Box3().setFromObject(terrainMesh);
+                const rawSize = Math.max(rawBox.max.x - rawBox.min.x, rawBox.max.z - rawBox.min.z);
+                const s = (newScale * 5000) / rawSize;
+                terrainMesh.scale.set(s, s, s);
+                terrainMesh.updateMatrixWorld();
+                const box2 = new THREE.Box3().setFromObject(terrainMesh);
+                terrainMesh.position.set(-box2.min.x, 0, -box2.min.z);
+                terrainMesh.updateMatrixWorld();
+                const box3 = new THREE.Box3().setFromObject(terrainMesh);
+                const worldSize = Math.max(box3.max.x - box3.min.x, box3.max.z - box3.min.z);
+                console.log('Scaled: 1 unit =', newScale, 'm, terrain', worldSize.toFixed(0), 'x', worldSize.toFixed(0));
+                buildHeightGrid(terrainMesh);
+                document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
+                if (gunMarker) gunMarker.position.set(gunOffset.x, getTerrainH(gunOffset.x, gunOffset.z), gunOffset.z);
+                if (gunRing) gunRing.position.copy(gunMarker.position);
+                const center2 = new THREE.Box3().setFromObject(terrainMesh).getCenter(new THREE.Vector3());
+                orbit.target.copy(center2);
+                orbit.distance = worldSize * 1.5;
+                updateCamera();
+            });
+            document.getElementById('launchBtn').addEventListener('click', launchShot);
+            document.getElementById('pauseBtnB').addEventListener('click', togglePause);
+            document.getElementById('resetShotBtnB').addEventListener('click', resetShot);
+            document.getElementById('findAngleBtn').addEventListener('click', findAngleForTarget);
+            document.getElementById('snapTargetBtn').addEventListener('click', setTargetToPrediction);
+            document.getElementById('preset').addEventListener('change', function(e) { applyPreset(e.target.value); });
+
+            // Wind direction/speed sync
+            function syncWindFromDir() {
+                var dir = Number(document.getElementById('windDir').value) || 0;
+                var spd = Number(document.getElementById('windSpeed').value) || 0;
+                var rad = dir * Math.PI / 180;
+                document.getElementById('windX').value = Math.round(spd * Math.cos(rad));
+                document.getElementById('windZ').value = Math.round(spd * Math.sin(rad));
+                rebuildPreview();
+            }
+            function syncDirFromWind() {
+                var wx = Number(document.getElementById('windX').value) || 0;
+                var wz = Number(document.getElementById('windZ').value) || 0;
+                var spd = Math.round(Math.hypot(wx, wz));
+                var dir = Math.round(Math.atan2(wz, wx) * 180 / Math.PI);
+                if (dir < 0) dir += 360;
+                document.getElementById('windSpeed').value = spd;
+                document.getElementById('windDir').value = dir;
+            }
+            document.getElementById('windDir').addEventListener('input', syncWindFromDir);
+            document.getElementById('windSpeed').addEventListener('input', syncWindFromDir);
+            document.getElementById('windX').addEventListener('input', syncDirFromWind);
+            document.getElementById('windZ').addEventListener('input', syncDirFromWind);
+
+            document.querySelectorAll('#cdModelGroup button').forEach(function(b) {
+                b.addEventListener('click', function() {
+                    document.querySelectorAll('#cdModelGroup button').forEach(function(x) { x.classList.remove('active'); });
+                    b.classList.add('active');
+                    rebuildPreview();
+                });
+            });
+
+            // ── Compass ────────────────────────────────────────────────────
+            function drawCompass(deg) {
+                const c = document.getElementById('compassCanvas');
+                const ctx = c.getContext('2d');
+                const cx = 40, cy = 40, r = 34;
+                ctx.clearRect(0, 0, 80, 80);
+                ctx.fillStyle = 'rgba(17,22,27,0.9)';
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 2; ctx.stroke();
+                for (let a = 0; a < 360; a += 15) {
+                    const rad = a * Math.PI / 180;
+                    const inner = a % 90 === 0 ? r - 10 : a % 30 === 0 ? r - 7 : r - 4;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.cos(rad) * inner, cy - Math.sin(rad) * inner);
+                    ctx.lineTo(cx + Math.cos(rad) * r, cy - Math.sin(rad) * r);
+                    ctx.strokeStyle = a % 90 === 0 ? 'rgba(240,178,79,0.5)' : 'rgba(255,255,255,0.12)';
+                    ctx.lineWidth = a % 90 === 0 ? 1.5 : 1; ctx.stroke();
+                }
+                ctx.fillStyle = '#889'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('N', cx, 10); ctx.fillText('S', cx, 76);
+                ctx.fillText('E', 76, cy + 3); ctx.fillText('W', 4, cy + 3);
+                const rad = deg * Math.PI / 180;
+                const nx = cx + Math.cos(rad) * (r - 8);
+                const ny = cy - Math.sin(rad) * (r - 8);
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nx, ny);
+                ctx.strokeStyle = '#f0b24f'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fillStyle = '#f0b24f'; ctx.fill();
+                const a1 = rad + 0.05; const a2 = rad - 0.05;
+                ctx.beginPath(); ctx.moveTo(nx, ny);
+                ctx.lineTo(cx + Math.cos(a1) * (r - 14), cy - Math.sin(a1) * (r - 14));
+                ctx.lineTo(cx + Math.cos(a2) * (r - 14), cy - Math.sin(a2) * (r - 14));
+                ctx.closePath(); ctx.fillStyle = '#f0b24f'; ctx.fill();
+            }
+            function setAzimuth(deg) {
+                deg = ((deg % 360) + 360) % 360;
+                document.getElementById('azimuth').value = Math.round(deg);
+                document.getElementById('compassVal').textContent = Math.round(deg) + '°';
+                drawCompass(deg);
+                rebuildPreview();
+            }
+            // Sync azimuth input → compass
+            document.getElementById('azimuth').addEventListener('input', function() {
+                const deg = Number(this.value) || 0;
+                document.getElementById('compassVal').textContent = Math.round(((deg % 360) + 360) % 360) + '°';
+                drawCompass(deg);
+            });
+            const compassEl = document.getElementById('compass');
+            let compassDragging = false;
+            compassEl.addEventListener('pointerdown', function(e) {
+                compassDragging = true;
+                compassEl.setPointerCapture(e.pointerId);
+                const rect = compassEl.getBoundingClientRect();
+                const cx = 40, cy = 40;
+                const dx = e.clientX - rect.left - cx;
+                const dy = e.clientY - rect.top - cy;
+                let deg = Math.atan2(-dy, dx) * 180 / Math.PI;
+                setAzimuth(deg);
+            });
+            compassEl.addEventListener('pointermove', function(e) {
+                if (!compassDragging) return;
+                const rect = compassEl.getBoundingClientRect();
+                const cx = 40, cy = 40;
+                const dx = e.clientX - rect.left - cx;
+                const dy = e.clientY - rect.top - cy;
+                let deg = Math.atan2(-dy, dx) * 180 / Math.PI;
+                setAzimuth(deg);
+            });
+            compassEl.addEventListener('pointerup', function() { compassDragging = false; });
+            drawCompass(45);
+            // Arrow buttons with long-press
+            var compassTimer = null;
+            var compassDelay = null;
+            function startCompassSpin(dir) {
+                compassTimer = setInterval(function() {
+                    var deg = Number(document.getElementById('azimuth').value) || 0;
+                    setAzimuth(deg + dir * 5);
+                }, 1000);
+            }
+            function stopCompassSpin() {
+                if (compassTimer) { clearInterval(compassTimer); compassTimer = null; }
+                if (compassDelay) { clearTimeout(compassDelay); compassDelay = null; }
+            }
+            document.getElementById('compassInc').addEventListener('pointerdown', function() {
+                setAzimuth((Number(document.getElementById('azimuth').value) || 0) - 1);
+                stopCompassSpin();
+                compassDelay = setTimeout(function() { startCompassSpin(-1); }, 3000);
+            });
+            document.getElementById('compassInc').addEventListener('pointerup', stopCompassSpin);
+            document.getElementById('compassInc').addEventListener('pointerleave', stopCompassSpin);
+            document.getElementById('compassDec').addEventListener('pointerdown', function() {
+                setAzimuth((Number(document.getElementById('azimuth').value) || 0) + 1);
+                stopCompassSpin();
+                compassDelay = setTimeout(function() { startCompassSpin(1); }, 3000);
+            });
+            document.getElementById('compassDec').addEventListener('pointerup', stopCompassSpin);
+            document.getElementById('compassDec').addEventListener('pointerleave', stopCompassSpin);
+
+            // ── Wind compass ──────────────────────────────────────────────
+            function drawWindCompass(deg) {
+                var c = document.getElementById('windCompassCanvas');
+                var ctx = c.getContext('2d');
+                var cx = 40, cy = 40, r = 34;
+                ctx.clearRect(0, 0, 80, 80);
+                ctx.fillStyle = 'rgba(17,22,27,0.9)';
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 2; ctx.stroke();
+                for (var a = 0; a < 360; a += 30) {
+                    var rad = a * Math.PI / 180;
+                    var inner = a % 90 === 0 ? r - 10 : r - 6;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.cos(rad)*inner, cy - Math.sin(rad)*inner);
+                    ctx.lineTo(cx + Math.cos(rad)*r, cy - Math.sin(rad)*r);
+                    ctx.strokeStyle = a % 90 === 0 ? 'rgba(91,200,240,0.4)' : 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = a % 90 === 0 ? 1.5 : 0.8; ctx.stroke();
+                }
+                ctx.fillStyle = '#778'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('N', cx, 10); ctx.fillText('S', cx, 76);
+                ctx.fillText('E', 76, cy+3); ctx.fillText('W', 4, cy+3);
+                var rad = deg * Math.PI / 180;
+                var nx = cx + Math.cos(rad)*(r-10);
+                var ny = cy - Math.sin(rad)*(r-10);
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nx, ny);
+                ctx.strokeStyle = '#5bc8f0'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fillStyle = '#5bc8f0'; ctx.fill();
+                var a1 = rad+0.05, a2 = rad-0.05;
+                ctx.beginPath(); ctx.moveTo(nx, ny);
+                ctx.lineTo(cx+Math.cos(a1)*(r-15), cy-Math.sin(a1)*(r-15));
+                ctx.lineTo(cx+Math.cos(a2)*(r-15), cy-Math.sin(a2)*(r-15));
+                ctx.closePath(); ctx.fillStyle = '#5bc8f0'; ctx.fill();
+            }
+            function setWindDir(deg) {
+                deg = ((deg%360)+360)%360;
+                document.getElementById('windDir').value = Math.round(deg);
+                document.getElementById('windDirInput').value = Math.round(deg);
+                document.getElementById('windCompassVal').textContent = Math.round(deg)+'°';
+                drawWindCompass(deg);
+                syncWindFromDir();
+            }
+            var windComp = document.getElementById('windCompass');
+            var windDrag = false;
+            windComp.addEventListener('pointerdown', function(e) {
+                windDrag = true; windComp.setPointerCapture(e.pointerId);
+                var rect = windComp.getBoundingClientRect();
+                var dx = e.clientX - rect.left - 40, dy = e.clientY - rect.top - 40;
+                setWindDir(Math.atan2(-dy, dx)*180/Math.PI);
+            });
+            windComp.addEventListener('pointermove', function(e) {
+                if (!windDrag) return;
+                var rect = windComp.getBoundingClientRect();
+                var dx = e.clientX - rect.left - 40, dy = e.clientY - rect.top - 40;
+                setWindDir(Math.atan2(-dy, dx)*180/Math.PI);
+            });
+            windComp.addEventListener('pointerup', function() { windDrag = false; });
+            // Sync input → compass
+            document.getElementById('windDirInput').addEventListener('input', function() {
+                var deg = Number(this.value) || 0;
+                document.getElementById('windDir').value = Math.round(deg);
+                document.getElementById('windCompassVal').textContent = Math.round(deg)+'°';
+                drawWindCompass(deg);
+                syncWindFromDir();
+            });
+            drawWindCompass(0);
+
+            // Auto-rebuild preview on input changes
+            ['v0','angle','azimuth','h0','windX','windY','windZ','turbulence','mass','formFactor','cdConst'].forEach(function(id) {
+                document.getElementById(id).addEventListener('input', rebuildPreview);
+            });
+
+            resize();
+            updateCamera();
+
+            // Draggable panels
+            var orientPanel = document.getElementById('orientPanel');
+            if (orientPanel) {
+                orientPanel.style.left = (window.innerWidth - 240) + 'px';
+                orientPanel.style.top = (window.innerHeight - 220) + 'px';
+            }
+            var tlib = document.getElementById('targetLib');
+            if (tlib) {
+                tlib.style.left = (window.innerWidth - 260) + 'px';
+                tlib.style.top = (window.innerHeight - 380) + 'px';
+            }
+            var simPan = document.getElementById('simPanel');
+            if (simPan) {
+                simPan.style.left = (window.innerWidth - 280) + 'px';
+                simPan.style.top = '140px';
+            }
+            document.querySelectorAll('.panel, .env-panel, .orient-panel').forEach(function(p) {
+                let offX = 0, offY = 0;
+                p.addEventListener('pointerdown', function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') return;
+                    p._dragging = true;
+                    p.setPointerCapture(e.pointerId);
+                    offX = e.clientX - p.offsetLeft;
+                    offY = e.clientY - p.offsetTop;
+                    p.style.cursor = 'grabbing';
+                });
+                p.addEventListener('pointermove', function(e) {
+                    if (!p._dragging) return;
+                    p.style.left = (e.clientX - offX) + 'px';
+                    p.style.top = (e.clientY - offY) + 'px';
+                });
+                p.addEventListener('pointerup', function() {
+                    p._dragging = false; p.style.cursor = '';
+                });
+            });
+
+            // ── Target library ─────────────────────────────────────────────
+            drawThumbnail('thumbFactory', '#8899aa', 'factory');
+            drawThumbnail('thumbVehicle', '#7a8a6a', 'vehicle');
+            function drawThumbnail(canvasId, color, type) {
+                var c = document.getElementById(canvasId);
+                var ctx = c.getContext('2d');
+                ctx.fillStyle = '#1a1d22'; ctx.fillRect(0,0,80,60);
+                ctx.fillStyle = color;
+                if (type === 'factory') {
+                    ctx.fillRect(15,20,50,25);
+                    ctx.beginPath(); ctx.moveTo(10,20); ctx.lineTo(40,5); ctx.lineTo(70,20); ctx.fill();
+                    ctx.fillStyle = '#665544'; ctx.fillRect(35,5,8,15);
+                } else {
+                    ctx.fillRect(20,30,40,15);
+                    ctx.fillRect(12,18,15,12);
+                    ctx.beginPath(); ctx.arc(20,42,6,0,Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(60,42,6,0,Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#aa8'; ctx.fillRect(28,22,10,8);
+                }
+            }
+            function createFactoryModel() {
+                var g = new THREE.Group();
+                var hall = new THREE.Mesh(new THREE.BoxGeometry(60,20,30), new THREE.MeshStandardMaterial({color:0x8899aa,roughness:0.7,metalness:0.3}));
+                hall.position.y = 10; g.add(hall);
+                var roof = new THREE.Mesh(new THREE.ConeGeometry(35,10,4), new THREE.MeshStandardMaterial({color:0x665544,roughness:0.8}));
+                roof.position.y = 25; roof.rotation.y = Math.PI/4; g.add(roof);
+                var chim = new THREE.Mesh(new THREE.CylinderGeometry(3,4,20,8), new THREE.MeshStandardMaterial({color:0x554444,roughness:0.9}));
+                chim.position.set(15,20,-8); g.add(chim);
+                return g;
+            }
+            function createVehicleModel() {
+                var g = new THREE.Group();
+                var body = new THREE.Mesh(new THREE.BoxGeometry(15,6,8), new THREE.MeshStandardMaterial({color:0x5a6a4a,roughness:0.6,metalness:0.2}));
+                body.position.y = 4; g.add(body);
+                var cab = new THREE.Mesh(new THREE.BoxGeometry(6,5,7), new THREE.MeshStandardMaterial({color:0x4a5a3a,roughness:0.5,metalness:0.3}));
+                cab.position.set(-4,7,0); g.add(cab);
+                var gun = new THREE.Mesh(new THREE.CylinderGeometry(1,1.5,8,8), new THREE.MeshStandardMaterial({color:0x334433,roughness:0.5,metalness:0.4}));
+                gun.position.set(5,8,0); gun.rotation.z = Math.PI/2; g.add(gun);
+                return g;
+            }
+            document.querySelectorAll('.target-card').forEach(function(card) {
+                card.addEventListener('click', function() {
+                    document.querySelectorAll('.target-card').forEach(function(c) { c.style.borderColor = 'transparent'; });
+                    card.style.borderColor = '#f0b24f';
+                    selectedTarget = card.dataset.target;
+                });
+            });
+            document.querySelector('.target-card[data-target="factory"]').style.borderColor = '#f0b24f';
+            selectedTarget = 'factory';
+
+            function placeTargetModel(wx, wz) {
+                if (!selectedTarget) return;
+                var h = getTerrainH(wx, wz);
+                if (selectedTarget === 'msta') {
+                    var loader = new OBJLoader();
+                    loader.load('Models/MSTA-S/2S19 MSTA.obj', function(obj) {
+                        obj.position.set(wx, h, wz);
+                        obj.traverse(function(c) { if (c.isMesh) { c.material = new THREE.MeshStandardMaterial({color:c.material.color||0x5a6a4a,roughness:0.6,metalness:0.3}); c.receiveShadow = true; } });
+                        scene.add(obj);
+                        targetModels.push(obj);
+                        addTargetRing(obj, wx, h, wz);
+                        updateTargetRange(wx, wz);
+                    });
+                    return;
+                }
+                var model = selectedTarget === 'factory' ? createFactoryModel() : createVehicleModel();
+                model.position.set(wx, h, wz);
+                addTargetRing(model, wx, h, wz);
+                scene.add(model);
+                targetModels.push(model);
+                updateTargetRange(wx, wz);
+            }
+            function addTargetRing(model, wx, h, wz) {
+                var ring = new THREE.Mesh(new THREE.TorusGeometry(100, 2, 8, 48), new THREE.MeshBasicMaterial({color:0xf25f5c}));
+                ring.rotation.x = Math.PI/2;
+                ring.position.set(wx, h+0.5, wz);
+                model.add(ring);
+            }
+            function updateTargetRange(wx, wz) {
+                var dx = wx - gunOffset.x, dz = wz - gunOffset.z;
+                document.getElementById('targetRange').value = Math.round(Math.hypot(dx, dz));
+                rebuildPreview();
+            }
+
+            // ── Simulation training block ────────────────────────────────────
+            var simData = [];
+            var simIndex = 0;
+            var simRunning = false;
+            var simPaused = false;
+            var simBtn = document.getElementById('btnSimPlay');
+            var simStatus = document.getElementById('simStatus');
+            var simList = document.getElementById('simList');
+            var placeMode = 'gun';
+            var simColors = ['#f0b24f','#5bc8f0','#4ecb71','#e87a5b','#9a8fe0'];
+            var simHistoryLines = []; // 'gun' or 'target'
+
+            var btnModeGun = document.getElementById('btnModeGun');
+            var btnModeTarget = document.getElementById('btnModeTarget');
+            btnModeGun.addEventListener('click', function() {
+                placeMode = 'gun';
+                btnModeGun.style.background = 'rgba(78,203,113,0.2)'; btnModeGun.style.borderColor = '#4ecb71'; btnModeGun.style.color = '#4ecb71';
+                btnModeTarget.style.background = ''; btnModeTarget.style.borderColor = ''; btnModeTarget.style.color = '';
+            });
+            btnModeTarget.addEventListener('click', function() {
+                placeMode = 'target';
+                btnModeTarget.style.background = 'rgba(242,95,92,0.2)'; btnModeTarget.style.borderColor = '#f25f5c'; btnModeTarget.style.color = '#f25f5c';
+                btnModeGun.style.background = ''; btnModeGun.style.borderColor = ''; btnModeGun.style.color = '';
+            });
+
+            function loadSimData() {
+                var raw = localStorage.getItem('nn_top5_results');
+                if (!raw) { simList.textContent = 'Нет данных. Загрузите топ-5 из nn-train.'; return; }
+                simData = JSON.parse(raw);
+                simIndex = 0; simRunning = false; simPaused = false;
+                simBtn.textContent = '▶ Старт';
+                simBtn.style.background = 'rgba(78,203,113,0.2)'; simBtn.style.borderColor = '#4ecb71'; simBtn.style.color = '#4ecb71';
+                var html = '';
+                simData.forEach(function(r,i) { html += (i+1)+'. <span style="color:'+simColors[i]+'">V₀='+r.v0+' ∠'+r.angle+'° → '+r.rangeSim+'м (err '+r.err+'%)</span><br>'; });
+                simList.innerHTML = html;
+                simStatus.textContent = 'Загружено '+simData.length+' сценариев';
+            }
+
+            function simPlayPauseStop() {
+                if (!simData.length) { loadSimData(); return; }
+                if (simRunning && !simPaused) { simPaused=true; simBtn.textContent='⏸ Пауза'; simBtn.style.background='rgba(240,178,79,0.15)'; simBtn.style.borderColor='#f0b24f'; simBtn.style.color='#f0b24f'; simStatus.textContent='Пауза'; return; }
+                if (simPaused) { simPaused=false; simBtn.textContent='⏹ Стоп'; simBtn.style.background='rgba(242,95,92,0.2)'; simBtn.style.borderColor='#f25f5c'; simBtn.style.color='#f25f5c'; simStatus.textContent='Выполняется'; simNextShot(); return; }
+                if (simRunning) return;
+                simIndex=0; simRunning=true; simPaused=false;
+                simBtn.textContent='⏹ Стоп'; simBtn.style.background='rgba(242,95,92,0.2)'; simBtn.style.borderColor='#f25f5c'; simBtn.style.color='#f25f5c';
+                simStatus.textContent='Выполняется 1/'+simData.length;
+                simNextShot();
+            }
+
+            function simNextShot() {
+                if (!simRunning || simPaused) return;
+                if (simIndex >= simData.length) { simRunning=false; simBtn.textContent='▶ Старт'; simBtn.style.background='rgba(78,203,113,0.2)'; simBtn.style.borderColor='#4ecb71'; simBtn.style.color='#4ecb71'; simStatus.textContent='Завершено ('+simData.length+' выстрелов)'; return; }
+                var r = simData[simIndex];
+                var azimuth = Number(document.getElementById('azimuth').value) || 0;
+                var color = simColors[simIndex];
+                document.getElementById('v0').value = r.v0;
+                document.getElementById('angle').value = r.angle;
+                document.getElementById('h0').value = Math.round(getTerrainH(gunOffset.x, gunOffset.z));
+                document.getElementById('azimuth').value = azimuth;
+                document.getElementById('targetRange').value = r.rangeSim;
+                setAzimuth(azimuth);
+                if (previewLine) { previewLine.material.color.set(color); previewLine.material.opacity = 1; }
+                rebuildPreview();
+                // Capture preview points BEFORE launch clears them
+                var savedTrail = null;
+                if (previewLine && previewLine.geometry.attributes.position.count > 1) {
+                    var arr = previewLine.geometry.attributes.position.array;
+                    savedTrail = arr.slice(); // copy
+                }
+                launchShot();
+                if (trajectoryLine) { trajectoryLine.material.color.set(0x00ddff); }
+                simIndex++;
+                simStatus.innerHTML = '<span style="color:'+color+'">Выполняется '+simIndex+'/'+simData.length+'</span>';
+                var iv = setInterval(function() {
+                    if (!shot || shot.landed || !simRunning) { clearInterval(iv);
+                        if (savedTrail && savedTrail.length >= 6) {
+                            var pts = [];
+                            for (var j=0; j<savedTrail.length; j+=3) pts.push(new THREE.Vector3(savedTrail[j],savedTrail[j+1],savedTrail[j+2]));
+                            var histGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                            var histLine = new THREE.Line(histGeo, new THREE.LineBasicMaterial({color:color,linewidth:2,transparent:true,opacity:0.8}));
+                            scene.add(histLine); simHistoryLines.push(histLine);
+                        }
+                        if (previewLine) { previewLine.material.color.set(0xf0b24f); }
+                        if (trajectoryLine) { trajectoryLine.material.color.set(0xffffff); }
+                        if (simIndex < simData.length && simRunning && !simPaused) setTimeout(simNextShot, 600);
+                        else if (simIndex >= simData.length) { simRunning=false; simBtn.textContent='▶ Старт'; simBtn.style.background='rgba(78,203,113,0.2)'; simBtn.style.borderColor='#4ecb71'; simBtn.style.color='#4ecb71'; simStatus.textContent='Завершено'; }
+                    }
+                }, 200);
+            }
+
+            function simClear() { simData=[]; simIndex=0; simRunning=false; simPaused=false; simList.textContent='Нет данных'; simStatus.textContent=''; simBtn.textContent='▶ Старт'; simBtn.style.background='rgba(78,203,113,0.2)'; simBtn.style.borderColor='#4ecb71'; simBtn.style.color='#4ecb71'; simHistoryLines.forEach(function(l){scene.remove(l)}); simHistoryLines=[]; }
+
+            simBtn.addEventListener('click', simPlayPauseStop);
+            document.getElementById('btnSimClear').addEventListener('click', simClear);
+            loadSimData();
+
+            const clickRaycaster = new THREE.Raycaster();
+            clickRaycaster.far = 500000;
+            function placeGun(e) {
+                const rect = canvas.getBoundingClientRect();
+                const mouse = new THREE.Vector2(
+                    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((e.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                clickRaycaster.setFromCamera(mouse, camera);
+                const hits = clickRaycaster.intersectObject(terrainMesh, true);
+                if (hits.length > 0) {
+                    gunOffset.x = hits[0].point.x;
+                    gunOffset.z = hits[0].point.z;
+                    const h = getTerrainH(gunOffset.x, gunOffset.z);
+                    if (gunMarker) gunMarker.position.set(gunOffset.x, h, gunOffset.z);
+                    if (gunRing) gunRing.position.set(gunOffset.x, h, gunOffset.z);
+                    document.getElementById('h0').value = Math.round(h);
+                    rebuildPreview();
+                }
+            }
+
+            function placeTargetClick(e) {
+                var rect = canvas.getBoundingClientRect();
+                var mouse = new THREE.Vector2(
+                    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((e.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                clickRaycaster.setFromCamera(mouse, camera);
+                var hits = clickRaycaster.intersectObject(terrainMesh, true);
+                if (hits.length > 0) placeTargetModel(hits[0].point.x, hits[0].point.z);
+            }
+
+            // Clear targets on terrain reset
+            var origResetFn = resetShot;
+            resetShot = function() {
+                targetModels.forEach(function(m) { scene.remove(m); });
+                targetModels = [];
+                origResetFn();
+            };
+
+            // ── 3D Axis indicator ────────────────────────────────────────
+            var axisScene = new THREE.Scene();
+            var axisCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+            axisCamera.position.set(5, 3, 5);
+            axisCamera.lookAt(0, 0, 0);
+            var axisGroup = new THREE.Group();
+            var axisLen = 80;
+            var xLine = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(axisLen,0,0)]),
+                new THREE.LineBasicMaterial({color:0xf25f5c, linewidth:2})
+            );
+            var yLine = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,axisLen,0)]),
+                new THREE.LineBasicMaterial({color:0x4ecb71, linewidth:2})
+            );
+            var zLine = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,axisLen)]),
+                new THREE.LineBasicMaterial({color:0x5bc8f0, linewidth:2})
+            );
+            axisGroup.add(xLine, yLine, zLine);
+            // Labels using sprites
+            function makeAxisLabel(text, color) {
+                var c = document.createElement('canvas'); c.width=64; c.height=32;
+                var ctx = c.getContext('2d'); ctx.fillStyle=color; ctx.font='bold 24px monospace'; ctx.fillText(text,4,26);
+                var tex = new THREE.CanvasTexture(c); var sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
+                sprite.scale.set(25,12,1); return sprite;
+            }
+            var xLabel = makeAxisLabel('X', '#f25f5c'); xLabel.position.set(axisLen+15,0,0);
+            var yLabel = makeAxisLabel('Y', '#4ecb71'); yLabel.position.set(0,axisLen+15,0);
+            var zLabel = makeAxisLabel('Z', '#5bc8f0'); zLabel.position.set(0,0,axisLen+15);
+            axisGroup.add(xLabel, yLabel, zLabel);
+            axisScene.add(axisGroup);
+
+            // Sync axis orientation with main camera
+            function updateAxisIndicator() {
+                if (!camera) return;
+                var q = camera.quaternion.clone();
+                axisGroup.quaternion.copy(q);
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if (shotRunning) updateShot(1/60);
+                updateAxisIndicator();
+                renderer.render(scene, camera);
+                // Render axis on top
+                renderer.autoClear = false;
+                renderer.clearDepth();
+                var w = renderer.domElement.width, h = renderer.domElement.height;
+                var vw = 150, vh = 150;
+                renderer.setViewport(w - vw - 10, 10, vw, vh);
+                renderer.setScissor(w - vw - 10, 10, vw, vh);
+                renderer.setScissorTest(true);
+                renderer.render(axisScene, axisCamera);
+                renderer.setScissorTest(false);
+                renderer.setViewport(0, 0, w, h);
+                renderer.autoClear = true;
+            }
+            animate();
+            loadOBJTerrain('Terrain_2.obj');
+        })();
+    </script>
+    <footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer>
+</body>
+</html>
+

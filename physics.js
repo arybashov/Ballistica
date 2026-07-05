@@ -11,6 +11,11 @@ const SEA_LEVEL_T = 288.15;
 const SEA_LEVEL_P = 101325;
 const SEA_LEVEL_RHO = 1.225;
 
+function getTerrainHeight(x, z) {
+    if (typeof window !== 'undefined' && window._terrainHeightFn) return window._terrainHeightFn(x, z);
+    return 0;
+}
+
 const PROJECTILE_PRESETS = Object.freeze({
     shell152Of540Like: Object.freeze({
         label: '152 мм ОФ-снаряд, учебный пресет',
@@ -427,8 +432,14 @@ class Projectile {
         if (this.landed) return;
 
         const s0 = { x: this.x, y: this.y, z: this.z, vx: this.vx, vy: this.vy, vz: this.vz, t: this.t };
+        // Pre-step check
+        if (getTerrainHeight(this.x, this.z) >= this.y && this.t > 1.0) {
+            this.landed = true;
+            return;
+        }
+
         const k1 = this.derivatives(s0);
-        const k2 = this.derivatives({
+        const sm = {
             x: s0.x + k1.dx * dt / 2,
             y: s0.y + k1.dy * dt / 2,
             z: s0.z + k1.dz * dt / 2,
@@ -436,7 +447,20 @@ class Projectile {
             vy: s0.vy + k1.dvy * dt / 2,
             vz: s0.vz + k1.dvz * dt / 2,
             t: s0.t + dt / 2
-        });
+        };
+        // Mid-step terrain check
+        const midGround = getTerrainHeight(sm.x, sm.z);
+        if (sm.y < midGround) {
+            const f = clamp((s0.y - midGround) / Math.max(1e-9, s0.y - sm.y), 0, 1);
+            this.x = lerp(s0.x, sm.x, f);
+            this.y = midGround;
+            this.z = lerp(s0.z, sm.z, f);
+            this.t = lerp(s0.t, sm.t, f);
+            this.landed = true;
+            this.trail.push({ x: this.x, y: this.y, z: this.z });
+            return;
+        }
+        const k2 = this.derivatives(sm);
         const k3 = this.derivatives({
             x: s0.x + k2.dx * dt / 2,
             y: s0.y + k2.dy * dt / 2,
@@ -481,11 +505,12 @@ class Projectile {
         this.updateStabilityDiagnostics(diag);
         this.impactSpeed = this.getSpeed();
 
-        if (this.y <= 0 && this.t > 0) {
+        const groundY = getTerrainHeight(this.x, this.z);
+        if (this.y <= groundY && this.t > 0) {
             const denom = prev.y - this.y;
-            const f = denom > 1e-9 ? clamp(prev.y / denom, 0, 1) : 1;
+            const f = denom > 1e-9 ? clamp((prev.y - groundY) / denom, 0, 1) : 1;
             this.x = lerp(prev.x, this.x, f);
-            this.y = 0;
+            this.y = groundY;
             this.z = lerp(prev.z, this.z, f);
             this.t = lerp(prev.t, this.t, f);
             this.vx = lerp(prev.vx, this.vx, f);

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica / Нейросеть</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: linear-gradient(180deg,rgba(11,14,16,0.95) 0%,rgba(11,14,16,0.7) 80%,transparent); }
+        .topbar h1 { font-size: 18px; font-weight: 700; color: #f0b24f; margin: 0; }
+        .topbar p { font-size: 11px; color: #889; margin: 0; }
+        .main { max-width: 1100px; margin: 0 auto; padding: 20px; position: fixed; top: 56px; bottom: 50px; left: 0; right: 0; overflow-y: auto; }
+        h2 { color: #f0b24f; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid rgba(240,178,79,0.15); padding-bottom: 6px; }
+        h3 { color: #96a8b6; font-size: 14px; margin: 16px 0 8px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .card { background: rgba(17,22,27,0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; }
+        .card.blue { border-left: 3px solid #5bc8f0; }
+        .card.green { border-left: 3px solid #4ecb71; }
+        .card.orange { border-left: 3px solid #f0b24f; }
+        .card.red { border-left: 3px solid #f25f5c; }
+        .card h4 { margin: 0 0 6px; font-size: 13px; }
+        .card.blue h4 { color: #5bc8f0; }
+        .card.green h4 { color: #4ecb71; }
+        .card.orange h4 { color: #f0b24f; }
+        .card.red h4 { color: #f25f5c; }
+        .card p, .card ul { font-size: 12px; color: #889; line-height: 1.5; margin: 4px 0; }
+        .card ul { padding-left: 16px; }
+        .card li { margin-bottom: 3px; }
+        .card li b { color: #aab; }
+        .diagram { background: rgba(17,22,27,0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 20px; margin: 16px 0; text-align: center; overflow-x: auto; }
+        .diagram svg { max-width: 100%; }
+        .flow-row { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap; margin: 10px 0; }
+        .flow-box { border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600; text-align: center; min-width: 70px; }
+        .flow-box.in { background: rgba(91,200,240,0.12); border: 1px solid rgba(91,200,240,0.3); color: #5bc8f0; }
+        .flow-box.nn { background: rgba(240,178,79,0.15); border: 1px solid rgba(240,178,79,0.4); color: #f0b24f; }
+        .flow-box.out { background: rgba(78,203,113,0.12); border: 1px solid rgba(78,203,113,0.3); color: #4ecb71; }
+        .flow-arrow { color: #556; font-size: 18px; margin: 0 8px; }
+        .compare-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }
+        .compare-table th { background: rgba(240,178,79,0.1); color: #f0b24f; padding: 6px 10px; text-align: left; font-weight: 600; border-bottom: 1px solid rgba(240,178,79,0.2); }
+        .compare-table td { padding: 6px 10px; color: #889; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .compare-table td b { color: #aab; }
+        .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; margin: 2px; }
+        .tag.g { background: rgba(78,203,113,0.12); color: #4ecb71; }
+        .tag.b { background: rgba(91,200,240,0.12); color: #5bc8f0; }
+        .tag.o { background: rgba(240,178,79,0.12); color: #f0b24f; }
+        .tag.r { background: rgba(242,95,92,0.12); color: #f25f5c; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div>
+            <h1>Ballistica / Нейросеть</h1>
+            <p>Применение RL-сети на цифровом полигоне</p>
+        </div>
+        <div class="top-actions">
+            <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
+            <a class="top-link" href="tactica.html">Tactica</a>
+            <a class="top-link" href="network.html">Сеть</a>
+            <a class="top-link" href="training.html">Обучение</a>
+            <a class="top-link" href="nn-train.html">Тренировка</a>
+        </div>
+    </div>
+
+    <div class="main">
+
+        <h2>Почему нейросеть на полигоне?</h2>
+
+        <div class="grid">
+            <div class="card blue">
+                <h4>Высота цели зависит от рельефа</h4>
+                <p>Цель на горе (+600 м) или в долине — уравнение попадания разное. Без карты высот сеть считает z=0 и ошибается по вертикали на сотни метров.</p>
+            </div>
+            <div class="card green">
+                <h4>Многотраекторность</h4>
+                <p>Одна дальность — две траектории. Настильная быстрее, но может встретить склон. Навесная перелетит хребет. Сеть выбирает безопасный вариант под рельеф.</p>
+            </div>
+            <div class="card orange">
+                <h4>Движущаяся цель</h4>
+                <p>Цель едет по рельефу — её высота меняется с координатами. Упреждение надо пересчитывать с учётом h(x+dx, z+dz). Сеть делает это мгновенно.</p>
+            </div>
+            <div class="card red">
+                <h4>Экономия выстрелов</h4>
+                <p>Вместо пристрелки 3–5 снарядов — попадание с первого. RL-политика обучена на миллионах симулированных выстрелов с учётом рельефа и ветра.</p>
+            </div>
+        </div>
+
+        <h2>Архитектура нейросети</h2>
+
+        <div class="diagram">
+            <div class="flow-row">
+                <div class="flow-box in">V₀<br><small>скорость</small></div>
+                <div class="flow-box in">Угол<br><small>возвышения</small></div>
+                <div class="flow-box in">Азимут<br><small>направление</small></div>
+                <div class="flow-box in">Ветер<br><small>X Y Z</small></div>
+                <div class="flow-box in">Масса<br><small>снаряда</small></div>
+                <div class="flow-box in">Цель<br><small>x, z, v</small></div>
+                <div class="flow-box in">Рельеф<br><small>h(x,z)</small></div>
+            </div>
+            <div style="text-align:center;margin:8px 0"><span class="flow-arrow" style="font-size:22px">↓</span></div>
+            <div class="flow-row">
+                <span class="flow-box nn" style="min-width:260px">Нейросеть (MLP / RL-политика)<br><small>8 входов → 128 → 64 → 4 выхода</small></span>
+            </div>
+            <div style="text-align:center;margin:8px 0"><span class="flow-arrow" style="font-size:22px">↓</span></div>
+            <div class="flow-row">
+                <div class="flow-box out">Дальность<br><small>м</small></div>
+                <div class="flow-box out">Время<br><small>с</small></div>
+                <div class="flow-box out">Угол падения<br><small>°</small></div>
+                <div class="flow-box out">Энергия<br><small>МДж</small></div>
+            </div>
+        </div>
+
+        <h2>Режимы работы</h2>
+
+        <table class="compare-table">
+            <tr><th>Режим</th><th>Описание</th><th>Применение</th></tr>
+            <tr>
+                <td><b>Прямая задача</b></td>
+                <td>Дано: V₀, угол, азимут, ветер → сеть предсказывает точку падения</td>
+                <td><span class="tag g">Огонь по координатам</span></td>
+            </tr>
+            <tr>
+                <td><b>Обратная задача</b></td>
+                <td>Дано: координаты цели, ветер → сеть выдаёт угол и азимут</td>
+                <td><span class="tag b">Поражение с 1-го выстрела</span></td>
+            </tr>
+            <tr>
+                <td><b>Статическая цель</b></td>
+                <td>Цель неподвижна — расчёт по карте высот h(x,z) в точке цели</td>
+                <td><span class="tag g">Укрепления, позиции</span></td>
+            </tr>
+            <tr>
+                <td><b>Движущаяся цель</b></td>
+                <td>Цель меняет позицию — непрерывный пересчёт упреждения</td>
+                <td><span class="tag o">Колонны, бронетехника</span></td>
+            </tr>
+            <tr>
+                <td><b>RL-коррекция</b></td>
+                <td>После выстрела сеть сравнивает прогноз с телеметрией и корректирует модель</td>
+                <td><span class="tag r">Адаптация к износу ствола</span></td>
+            </tr>
+        </table>
+
+        <h2>Обучение на полигоне</h2>
+
+        <div class="grid">
+            <div class="card blue">
+                <h4>Фаза 1 — Генерация данных</h4>
+                <p>Симулятор прогоняет миллионы выстрелов с разными параметрами на реальном рельефе. Каждый запуск записывается: <b>входные параметры → результат</b>. Это эталонная таблица для обучения.</p>
+            </div>
+            <div class="card green">
+                <h4>Фаза 2 — Обучение сети</h4>
+                <p>Нейросеть тренируется на сгенерированных данных методом обратного распространения. Учится предсказывать точку падения без RK4 — за микросекунды вместо миллисекунд.</p>
+            </div>
+            <div class="card orange">
+                <h4>Фаза 3 — Валидация</h4>
+                <p>Реальные стрельбы → телеметрия снаряда. Сеть сравнивает прогноз с фактом, вычисляет поправку. При расхождении (износ ствола, аномальный ветер) — дообучается.</p>
+            </div>
+            <div class="card red">
+                <h4>Фаза 4 — Боевое применение</h4>
+                <p>Натренированная сеть работает в реальном времени: цель движется → упреждение пересчитывается → команда наведения → выстрел. Весь цикл — доли секунды.</p>
+            </div>
+        </div>
+
+        <h2>Преимущество нейросети над таблицами</h2>
+
+        <table class="compare-table">
+            <tr><th>Параметр</th><th>Таблицы стрельбы</th><th>Нейросеть + полигон</th></tr>
+            <tr><td><b>Скорость расчёта</b></td><td>Поиск в таблице ~1 мс</td><td>Прямой проход ~10 мкс</td></tr>
+            <tr><td><b>Точность</b></td><td>Дискретная (шаг таблицы)</td><td>Непрерывная интерполяция</td></tr>
+            <tr><td><b>Учёт рельефа</b></td><td>Нет (только превышение)</td><td>Полная 3D карта высот</td></tr>
+            <tr><td><b>Движущаяся цель</b></td><td>Ручной пересчёт</td><td>Автоматически, непрерывно</td></tr>
+            <tr><td><b>Адаптация</b></td><td>Нет (фиксированные)</td><td>Дообучение по телеметрии</td></tr>
+            <tr><td><b>Размер</b></td><td>Мегабайты таблиц</td><td>Килобайты весов сети</td></tr>
+        </table>
+
+    </div>
+<footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer></body>
+</html>
+
+

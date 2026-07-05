@@ -3,3 +3,11 @@
 *.js text eol=lf
 *.md text eol=lf
 *.json text eol=lf
+*.obj binary
+*.fbx binary
+*.terrain binary
+*.r16 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jfif binary

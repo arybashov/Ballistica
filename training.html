@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ballistica / Обучение</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #0b0e10; color: #c8cdd0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; margin: 0; overflow: hidden; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: rgba(11,14,16,0.95); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .topbar h1 { font-size: 18px; font-weight: 700; color: #f0b24f; margin: 0; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 20px; position: fixed; top: 56px; bottom: 50px; left: 0; right: 0; overflow-y: auto; }
+        h2 { color: #f0b24f; font-size: 18px; margin: 24px 0 10px; }
+        .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab { padding: 6px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; background: rgba(255,255,255,0.03); color: #889; cursor: pointer; font: 500 12px/1.3 inherit; }
+        .tab:hover { border-color: rgba(240,178,79,0.3); color: #ccc; }
+        .tab.active { background: rgba(240,178,79,0.12); border-color: #f0b24f; color: #f0b24f; }
+        .class-card { background: rgba(17,22,27,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 12px; display: none; }
+        .class-card.active { display: block; }
+        .class-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .class-badge { font-size: 28px; font-weight: 800; color: #f0b24f; min-width: 48px; }
+        .class-info h3 { margin: 0; font-size: 15px; color: #e0e0e0; }
+        .class-info p { margin: 2px 0 0; font-size: 11px; color: #778; }
+        .ammo-block { display: flex; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+        .ammo-tag { padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .ammo-tag.s152 { background: rgba(240,178,79,0.12); color: #f0b24f; border: 1px solid rgba(240,178,79,0.25); }
+        .ammo-tag.s120 { background: rgba(91,200,240,0.12); color: #5bc8f0; border: 1px solid rgba(91,200,240,0.25); }
+        .lesson-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 8px; }
+        .lesson-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; }
+        .lesson-card h4 { margin: 0 0 4px; font-size: 12px; color: #aab; }
+        .lesson-card p { font-size: 10px; color: #778; line-height: 1.4; margin: 0 0 4px; }
+        .lesson-card .params { font-size: 9px; color: #667; margin-top: 4px; }
+        .lesson-num { display: inline-block; background: rgba(240,178,79,0.12); color: #f0b24f; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; margin-bottom: 4px; }
+        .weight-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 12px 0; }
+        .weight-table th { background: rgba(240,178,79,0.08); color: #f0b24f; padding: 5px 8px; text-align: left; font-weight: 600; }
+        .weight-table td { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #889; }
+        .weight-table .val { color: #aab; font-weight: 600; text-align: right; }
+        .difficulty-bar { height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 4px; }
+        .difficulty-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #4ecb71, #f0b24f, #f25f5c); }
+        .info-box { background: rgba(91,200,240,0.06); border: 1px solid rgba(91,200,240,0.15); border-radius: 6px; padding: 10px; margin: 12px 0; font-size: 11px; color: #889; line-height: 1.5; }
+        .info-box b { color: #aab; }
+    </style>
+</head>
+<body>
+<div class="topbar">
+    <h1>Ballistica / Обучение</h1>
+    <div class="top-actions">
+        <a class="top-link" href="whitepapers.html" target="_blank" rel="noopener">Whitepapers</a>
+        <a class="top-link" href="tactica.html">Tactica</a>
+        <a class="top-link" href="network.html">Сеть</a>
+        <a class="top-link" href="training.html">Обучение</a>
+        <a class="top-link" href="nn-train.html">Тренировка</a>
+    </div>
+</div>
+
+    <div class="main" id="mainContent">
+    <h2>Классы обучения нейросети</h2>
+
+    <div class="info-box">
+        <b>Как работает:</b> выбрать класс и урок → параметры подгружаются из <b>tactica.html</b>.
+        Симуляция запускается с заданными весами наград. Нейросеть учится минимизировать ошибку попадания
+        с учётом рельефа. <b>2 боеприпаса:</b> <span class="ammo-tag s152">152 мм ОФ</span> и <span class="ammo-tag s120">120 мм мина</span>.
+    </div>
+
+    <div class="tabs" id="classTabs"></div>
+    <div id="classContent"></div>
+
+    <h2>Таблица весов наград</h2>
+    <table class="weight-table" id="weightTable"></table>
+
+    <div class="info-box">
+        <b>Обозначения весов:</b> <b>прогресс</b> — сокращение 3D-дистанции до цели,
+        <b>точка</b> — бонус за вход в радиус цели, <b>точность</b> — штраф за отклонение,
+        <b>высота</b> — штраф за отклонение от высоты цели, <b>время</b> — штраф за длительность полёта,
+        <b>авария</b> — штраф за падение/промах, <b>Vстаб</b> — стабильность вертикальной скорости,
+        <b>Курс</b> — выдерживание курса, <b>Тангаж</b> — стабильность тангажа,
+        <b>Vгор</b> — стабильность горизонтальной скорости.
+    </div>
+</div>
+
+<script>
+(function() {
+    const CLASSES = [
+        { id:1,  label:'Кинематика',       color:'#5ba3e8', diff:10,
+          desc:'Идеальные условия. Без инерции, ветра, рельефа. Плоская земля.',
+          lessons: [
+            {title:'Прямой выстрел', desc:'Снаряд летит по прямой к неподвижной цели. V₀=655, угол=45°. Учимся попадать в точку.', params:'v0=655 angle=45 azimuth=0 h0=0'},
+            {title:'Навесная траектория', desc:'Высокий угол — снаряд идёт по дуге. Учимся компенсировать баллистическое падение.', params:'v0=655 angle=70 azimuth=0 h0=0'},
+            {title:'Разные дальности', desc:'Три цели на разной дистанции. Учимся подбирать угол под дальность.', params:'v0=655 angle=var azimuth=0 h0=0 target=5000,10000,15000'},
+          ]},
+        { id:2,  label:'Инерция',          color:'#e87a5b', diff:20,
+          desc:'Включаем массу снаряда. Инерция меняет траекторию. Рельеф всё ещё плоский.',
+          lessons: [
+            {title:'152 мм — тяжёлый', desc:'Масса 43.5 кг. Снаряд менее чувствителен к ветру, но требует точного угла.', params:'preset=shell152Of540Like mass=43.5'},
+            {title:'120 мм — лёгкий', desc:'Масса 16 кг. Быстрее теряет скорость, сильнее сносится ветром.', params:'preset=mortar120Like mass=16'},
+            {title:'Сравнение масс', desc:'Оба снаряда по одной цели. Учимся выбирать боеприпас под задачу.', params:'compare=152vs120 target=10000'},
+          ]},
+        { id:3,  label:'Ветер',            color:'#e8a830', diff:30,
+          desc:'Боковой и встречный ветер. Снаряд сносит — нужно упреждение по азимуту.',
+          lessons: [
+            {title:'Боковой ветер 10 м/с', desc:'Ветер строго сбоку. Учимся корректировать азимут.', params:'windX=0 windZ=10 target=10000'},
+            {title:'Встречный ветер 15 м/с', desc:'Ветер в лоб. Снаряд тормозится — нужен больший угол.', params:'windX=-15 windZ=0 target=10000'},
+            {title:'Переменный ветер', desc:'Ветер меняется по слоям. Турбулентность 5 м/с.', params:'windX=-5 windZ=8 turbulence=5'},
+          ]},
+        { id:4,  label:'Рельеф — равнина', color:'#9a8fe0', diff:40,
+          desc:'Включаем рельеф. Цель на разной высоте. Учёт превышения.',
+          lessons: [
+            {title:'Цель на возвышении', desc:'Цель выше пушки на 200 м. Увеличиваем угол.', params:'h0=200 target_height=400'},
+            {title:'Цель в низине', desc:'Цель ниже пушки. Уменьшаем угол, настильная траектория.', params:'h0=400 target_height=100'},
+            {title:'Три цели — три высоты', desc:'Разная высота целей. Сеть учится учитывать превышение для каждой.', params:'targets=(5000,50) (10000,300) (15000,0)'},
+          ]},
+        { id:5,  label:'Рельеф — горы',    color:'#e04b4b', diff:55,
+          desc:'Полноценный горный рельеф. Снаряд может встретить склон. Выбор настильной/навесной.',
+          lessons: [
+            {title:'Цель за хребтом', desc:'Между пушкой и целью — гора 300 м. Нужна навесная траектория.', params:'terrain=mountain target_behind_ridge=1'},
+            {title:'Цель на склоне', desc:'Цель на склоне горы. Попадание под углом к поверхности.', params:'terrain=mountain target_on_slope=1'},
+            {title:'Дальняя цель в горах', desc:'Дистанция 20+ км в горном рельефе. Предельная дальность.', params:'terrain=mountain target=22000 h0=500'},
+          ]},
+        { id:6,  label:'Адаптивность',     color:'#3ecaa5', diff:65,
+          desc:'Меняем условия между выстрелами. Сеть адаптируется без переобучения.',
+          lessons: [
+            {title:'Смена ветра', desc:'Между выстрелами ветер меняется. Сеть корректирует без пересчёта таблиц.', params:'wind_dynamic=1'},
+            {title:'Смена боеприпаса', desc:'Переход 152→120 мм. Сеть учитывает новую баллистику.', params:'ammo_switch=1'},
+            {title:'Смена рельефа', desc:'Пушка перемещается. Новый участок рельефа — сеть адаптируется.', params:'gun_move=1 terrain_shift=1'},
+          ]},
+        { id:7,  label:'Движущаяся цель',  color:'#4ecb71', diff:75,
+          desc:'Цель движется. Непрерывный пересчёт упреждения с учётом рельефа.',
+          lessons: [
+            {title:'Цель по прямой', desc:'Цель едет равномерно по равнине. Упреждение по X.', params:'target_speed=10 target_dir=0'},
+            {title:'Цель маневрирует', desc:'Цель меняет направление. Сеть пересчитывает каждые 0.5 с.', params:'target_speed=15 target_maneuver=1'},
+            {title:'Цель в горах', desc:'Цель едет по горному серпантину. Высота меняется с рельефом.', params:'target_speed=10 terrain=mountain target_on_road=1'},
+          ]},
+        { id:8,  label:'Помехи',           color:'#e87a5b', diff:82,
+          desc:'Добавляем шум измерений, задержку связи, неполные данные.',
+          lessons: [
+            {title:'Шум телеметрии', desc:'Координаты цели известны с погрешностью ±15 м.', params:'noise_position=15'},
+            {title:'Задержка данных', desc:'Данные о цели приходят с задержкой 2 с.', params:'data_lag=2'},
+            {title:'Неполный рельеф', desc:'Карта высот доступна с разрешением 100 м (вместо 2 м).', params:'terrain_coarse=1'},
+          ]},
+        { id:9,  label:'Экономия',         color:'#5ba3e8', diff:88,
+          desc:'Минимизация расхода боеприпасов. Попадание с 1-го выстрела.',
+          lessons: [
+            {title:'Первый выстрел', desc:'Без пристрелки. Сеть должна попасть с первого раза.', params:'first_shot=1 no_correction=1'},
+            {title:'Лимит 3 выстрела', desc:'На поражение даётся 3 попытки. Оптимизация угла после промаха.', params:'max_shots=3'},
+            {title:'Две цели — два выстрела', desc:'Поражение двух целей минимальным числом снарядов.', params:'targets=2 max_shots=3'},
+          ]},
+        { id:10, label:'Экзамен',          color:'#f0b24f', diff:95,
+          desc:'Полный сценарий: горы + ветер + движущаяся цель + помехи + экономия.',
+          lessons: [
+            {title:'Комплекс 1', desc:'Горы, ветер 10 м/с, цель 20 км. 152 мм. Первый выстрел.', params:'full_scenario=1 ammo=152'},
+            {title:'Комплекс 2', desc:'Движущаяся цель в горах. 120 мм. Ветер переменный.', params:'full_scenario=2 ammo=120 moving=1'},
+            {title:'Финальный экзамен', desc:'Всё вместе. Смена целей, боеприпасов, условий. Оценка точности.', params:'full_scenario=3 final=1'},
+          ]},
+    ];
+
+    const WEIGHTS = [
+        {label:'прогресс', desc:'Сокращение 3D-дистанции до цели'},
+        {label:'точка', desc:'Бонус за вход в радиус цели'},
+        {label:'точность', desc:'Штраф за отклонение от точки'},
+        {label:'высота', desc:'Штраф за отклонение по высоте'},
+        {label:'время', desc:'Штраф за длительность полёта'},
+        {label:'авария', desc:'Штраф за падение/промах'},
+        {label:'Vстаб', desc:'Стабильность верт. скорости'},
+        {label:'Курс', desc:'Выдерживание курса'},
+        {label:'Тангаж', desc:'Стабильность тангажа'},
+        {label:'Vгор', desc:'Стабильность гор. скорости'},
+    ];
+
+    const PRESET_WEIGHTS = [
+        [0.7, 1.0, 1.5, 0.5, 0.01, 5,  0.5, 0.5, 0.5, 1.0],  // Класс 1
+        [0.6, 1.0, 1.5, 0.5, 0.01, 5,  1.0, 1.0, 0.5, 1.5],  // Класс 2
+        [0.5, 1.5, 2.0, 0.5, 0.02, 8,  1.5, 2.0, 1.0, 2.0],  // Класс 3
+        [0.5, 2.0, 2.0, 1.5, 0.02, 8,  1.0, 1.5, 1.0, 1.5],  // Класс 4
+        [0.4, 2.0, 2.5, 2.0, 0.02, 10, 1.5, 2.0, 1.5, 2.0],  // Класс 5
+        [0.3, 2.0, 2.5, 2.0, 0.03, 12, 2.0, 2.5, 2.0, 2.5],  // Класс 6
+        [0.3, 2.5, 3.0, 2.5, 0.03, 12, 2.0, 3.0, 2.0, 3.0],  // Класс 7
+        [0.2, 2.5, 3.0, 2.5, 0.03, 15, 2.5, 3.0, 2.5, 3.0],  // Класс 8
+        [0.2, 3.0, 3.5, 3.0, 0.04, 15, 3.0, 3.0, 2.5, 3.0],  // Класс 9
+        [0.1, 3.0, 4.0, 3.0, 0.04, 20, 3.0, 3.5, 3.0, 3.5],  // Класс 10
+    ];
+
+    function buildUrl(cls) {
+        var p = cls.lessons[0].params;
+        return 'tactica.html?' + encodeURIComponent(p);
+    }
+
+    function renderTabs() {
+        var html = '';
+        CLASSES.forEach(function(c, i) {
+            html += '<div class="tab' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '">' + c.id + '. ' + c.label + '</div>';
+        });
+        document.getElementById('classTabs').innerHTML = html;
+        document.querySelectorAll('#classTabs .tab').forEach(function(t) {
+            t.addEventListener('click', function() {
+                document.querySelectorAll('#classTabs .tab').forEach(function(x) { x.classList.remove('active'); });
+                t.classList.add('active');
+                var idx = Number(t.dataset.idx);
+                renderClass(idx);
+                renderWeightTable(idx);
+            });
+        });
+    }
+
+    function renderClass(idx) {
+        var cls = CLASSES[idx];
+        var html = '<div class="class-card active">';
+        html += '<div class="class-header">';
+        html += '<div class="class-badge">' + cls.id + '</div>';
+        html += '<div class="class-info">';
+        html += '<h3>' + cls.label + '</h3>';
+        html += '<p>' + cls.desc + '</p>';
+        html += '<div class="difficulty-bar"><div class="difficulty-fill" style="width:' + cls.diff + '%"></div></div>';
+        html += '<span style="font-size:10px;color:#667">Сложность: ' + cls.diff + '%</span>';
+        html += '</div></div>';
+
+        html += '<div class="ammo-block">';
+        html += '<span class="ammo-tag s152">152 мм ОФ (43.5 кг)</span>';
+        html += '<span class="ammo-tag s120">120 мм мина (16 кг)</span>';
+        html += '</div>';
+
+        html += '<div class="lesson-row">';
+        cls.lessons.forEach(function(l, i) {
+            html += '<div class="lesson-card">';
+            html += '<span class="lesson-num">Урок ' + (i + 1) + '</span>';
+            html += '<h4>' + l.title + '</h4>';
+            html += '<p>' + l.desc + '</p>';
+            html += '<div class="params">Параметры: ' + l.params + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+
+        html += '<div style="margin-top:8px">';
+        html += '<a href="tactica.html" style="color:#f0b24f;font-size:11px;text-decoration:none;border:1px solid rgba(240,178,79,0.3);border-radius:4px;padding:4px 10px">Открыть в Tactica →</a>';
+        html += '<span style="font-size:10px;color:#667;margin-left:8px">Параметры подгружаются из полей tactica.html</span>';
+        html += '</div>';
+        html += '</div>';
+
+        document.getElementById('classContent').innerHTML = html;
+    }
+
+    function renderWeightTable(idx) {
+        var w = PRESET_WEIGHTS[idx];
+        var html = '<tr><th>Вес</th><th>Описание</th><th>Класс 1</th><th>Класс 2</th><th>Класс 3</th><th>Класс 4</th><th>Класс 5</th><th>Класс 6</th><th>Класс 7</th><th>Класс 8</th><th>Класс 9</th><th>Класс 10</th></tr>';
+        WEIGHTS.forEach(function(wt, row) {
+            html += '<tr><td><b>' + wt.label + '</b></td><td style="font-size:9px">' + wt.desc + '</td>';
+            PRESET_WEIGHTS.forEach(function(pw, ci) {
+                var isCurrent = ci === idx;
+                html += '<td class="val" style="' + (isCurrent ? 'color:#f0b24f;background:rgba(240,178,79,0.08)' : '') + '">' + pw[row] + '</td>';
+            });
+            html += '</tr>';
+        });
+        document.getElementById('weightTable').innerHTML = html;
+    }
+
+    renderTabs();
+    renderClass(0);
+    renderWeightTable(0);
+})();
+</script>
+<footer style="position:fixed;bottom:0;left:0;right:0;z-index:5;height:50px;background:rgba(11,14,16,0.9);border-top:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#556"></footer></body>
+</html>
+
+
