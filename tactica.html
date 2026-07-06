@@ -18,6 +18,9 @@
         .env-panel input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 3px; color: #ccc; padding: 2px 4px; font: 500 10px/1.3 inherit; }
         .env-panel button { display: block; width: 100%; margin-top: 4px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.10); border-radius: 4px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 10px/1.3 inherit; }
         .env-panel button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
+        .env-panel .info { margin-top: 5px; font: 500 10px/1.25 inherit; color: #889; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .env-panel .info.warn { color: #f0b24f; }
+        .env-panel .info.err { color: #f25f5c; }
         .panel h2 { font-size: 12px; font-weight: 600; color: #96a8b6; margin: 0 0 8px; }
         .panel button { display: block; width: 100%; margin-bottom: 4px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 5px; background: rgba(255,255,255,0.04); color: #aab; cursor: pointer; font: 500 11px/1.3 inherit; transition: all 0.15s; text-align: left; }
         .panel button:hover { border-color: rgba(240,178,79,0.4); color: #f0b24f; }
@@ -445,20 +448,32 @@
 
             function updateTrainedAimStatus(text) {
                 if (!nnAimStatus) return;
+                nnAimStatus.classList.remove('warn', 'err');
                 if (text) {
                     nnAimStatus.textContent = text;
+                    nnAimStatus.title = text;
                     return;
                 }
                 if (trainedAimModel && trainedAimModel.ok) {
                     const metrics = trainedAimModel.bundle.metrics;
                     if (metrics && Number.isFinite(metrics.avgPct)) {
                         const caution = metrics.avgPct > 20 ? ', только старт для физики' : '';
-                        nnAimStatus.textContent = 'Нейросеть: загружена, средн. ошибка ' + metrics.avgPct.toFixed(1) + '%' + caution;
+                        const status = 'НС: ошибка ' + metrics.avgPct.toFixed(1) + '%';
+                        nnAimStatus.textContent = status;
+                        nnAimStatus.title = 'Нейросеть загружена: средняя ошибка ' + metrics.avgPct.toFixed(1) + '%' + caution;
+                        if (metrics.avgPct > 20) nnAimStatus.classList.add('warn');
                     } else {
-                        nnAimStatus.textContent = 'Нейросеть: загружена';
+                        nnAimStatus.textContent = 'НС: загружена';
+                        nnAimStatus.title = 'Нейросеть загружена';
                     }
                 } else {
-                    nnAimStatus.textContent = 'Нейросеть: ' + ((trainedAimModel && trainedAimModel.reason) || 'нет модели');
+                    const reason = (trainedAimModel && trainedAimModel.reason) || 'нет модели';
+                    const shortText = reason === 'модель устарела' ? 'НС: переобучить' : 'НС: ' + reason;
+                    nnAimStatus.textContent = shortText;
+                    nnAimStatus.title = reason === 'модель устарела'
+                        ? 'Сохраненная модель устарела: нужна новая тренировка после добавления координат орудия.'
+                        : 'Нейросеть: ' + reason;
+                    nnAimStatus.classList.add(reason === 'модель не обучена' ? 'warn' : 'err');
                 }
             }
 
